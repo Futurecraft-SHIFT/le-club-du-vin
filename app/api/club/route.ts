@@ -10,7 +10,7 @@ const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>!Number.isNaN(Dat
 const short = z.string().trim().min(1).max(150);
 const axis = z.array(z.number().min(0).max(10)).length(6);
 const action = z.discriminatedUnion('action', [
- z.object({action:z.literal('bottle'),grapes:z.string().trim().max(150).default(''),comments:z.string().max(5000).default(''),name:short,producer:z.string().trim().max(150),vintage:z.string().regex(/^(\d{4}|NV)$/),style:z.enum(['Red','White','Orange','Rosé','Sparkling']),region:z.string().trim().max(150),count:z.number().int().min(0).max(9999),drink_from:z.string().regex(/^\d{4}$/),drink_to:z.string().regex(/^\d{4}$/),session_id:z.string().max(100).nullable()}),
+ z.object({action:z.literal('bottle'),grapes:z.string().trim().max(150).default(''),comments:z.string().max(5000).default(''),name:short,producer:z.string().trim().max(150),vintage:z.string().regex(/^(\d{4}|NV)$/),style:z.enum(['Red','White','Orange','Rosé','Sparkling']),region:z.string().trim().max(150),count:z.number().int().min(0).max(9999),drink_from:z.string().regex(/^\d{4}$/).optional(),drink_to:z.string().regex(/^\d{4}$/).optional(),session_id:z.string().max(100).nullable()}),
  z.object({action:z.literal('count'),id:short,count:z.number().int().min(0).max(9999)}),
  z.object({action:z.literal('taste'),bottle_id:short,date,score:z.number().min(1).max(5),notes:z.string().max(5000),axes:axis}),
  z.object({action:z.literal('session'),name:short,date}),
@@ -62,9 +62,9 @@ export async function POST(req:Request){
   await db.prepare('INSERT OR IGNORE INTO members (id,session_id,user_id) VALUES (?,?,?)').bind(id,s.id,uid).run();
  }
  if(a.action==='bottle'){
-  if(a.drink_to<a.drink_from)return reply({error:'The drinking window must end after it starts.'},400);
+  if(a.drink_from&&a.drink_to&&a.drink_to<a.drink_from)return reply({error:'The drinking window must end after it starts.'},400);
   if(a.session_id&&!await db.prepare('SELECT id FROM members WHERE session_id=? AND user_id=?').bind(a.session_id,uid).first())return reply({error:'Join this tasting before adding a bottle.'},403);
-  await db.prepare('INSERT INTO bottles (id,owner,session_id,name,producer,vintage,style,region,count,drink_from,drink_to,created_at,grapes,comments) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,uid,a.session_id,a.name,a.producer,a.vintage,a.style,a.region,a.count,a.drink_from,a.drink_to,now,a.grapes,a.comments).run();
+  await db.prepare('INSERT INTO bottles (id,owner,session_id,name,producer,vintage,style,region,count,drink_from,drink_to,created_at,grapes,comments) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,uid,a.session_id,a.name,a.producer,a.vintage,a.style,a.region,a.count,a.drink_from??'',a.drink_to??'',now,a.grapes,a.comments).run();
  }
  if(a.action==='count'){
   const r=await db.prepare('UPDATE bottles SET count=? WHERE id=? AND owner=?').bind(a.count,a.id,uid).run();
