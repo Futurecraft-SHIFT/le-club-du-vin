@@ -23,3 +23,15 @@ Sources for the surprise wine facts are linked beside each description. Flavor i
 
 Discovery history is saved atomically in browser IndexedDB, before reveal. It never silently resets at exhaustion. Clearing browser data or moving devices resets anonymous history. Catalog facts are sourced from MYSA public product metadata (12 October 2026); archived and sold-out vintages are included. Stock must be checked with a shop. Tasting prompts and pairing ideas are original style guides, not claimed bottle reviews.
 
+
+## Open catalog and personal taste
+The catalog is an expanding index, with a bundled offline starting point and additive server records. Any unindexed bottle can be entered manually. See CATALOG-UPDATES.md for the authenticated daily refresh and source coverage. New listings are not automatically described as new releases.
+
+Bottle autocomplete matches wine names, producers, grapes and regions, including accents and small typos. Selection fills metadata only: vintage and comments stay manual. Registration comments are hidden from other tasting-table members. Verified producer stories and same-producer discoveries appear in bottle panels.
+
+Personal tasting descriptions come before sliders. The lightweight local interpreter recognizes a limited English vocabulary of sensations and enjoyment; nuanced language can use the optional on-device model, whose interpretation must be reviewed. Unrecognized descriptions are not silently treated as expert facts. Recommendations connect a member's own reviews to grapes, producers and wine types, with reasons and uncertainty. No critic scores enter personal ranking.
+
+ALEX B admin is bootstrapped from the configured authenticated owner email, then bound to the stable Site account ID. The dashboard reports aggregate counts; optional visits require browser consent. No data resale is enabled. New profiles never receive demo bottles or sample tasting history.
+
+Run node scripts/check-core.mjs for route and persistence checks using isolated SQLite and injected authenticated identities. Run the TypeScript check and build for runtime compilation.
+

@@ -15,6 +15,27 @@
       "when": 1791811962187,
       "tag": "0001_awesome_fenris",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791814864004,
+      "tag": "0002_greedy_mariko_yashida",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1791815345873,
+      "tag": "0003_material_skin",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791816179456,
+      "tag": "0004_dapper_mastermind",
+      "breakpoints": true
     }
   ]
 }

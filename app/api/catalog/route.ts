@@ -1,0 +1,2 @@
+import {env} from 'cloudflare:workers';
+export async function GET(){try{const rows=await env.DB!.prepare('SELECT data FROM catalog_entries').all<{data:string}>();const sync=await env.DB!.prepare('SELECT * FROM catalog_sync').all();return Response.json({wines:rows.results.map(r=>JSON.parse(r.data)),sync:sync.results},{headers:{'Cache-Control':'no-store'}})}catch{return Response.json({wines:[],sync:[],error:'Live catalog unavailable; bundled index remains available.'},{status:503})}}

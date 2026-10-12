@@ -1,13 +1,14 @@
 import { env } from 'cloudflare:workers';
 import { getChatGPTUser } from '../../chatgpt-auth';
 import { z } from 'zod';
+import {isAdmin} from '../../admin-auth';
 import { flavor, winePalette } from '../../flavor';
 export const dynamic = 'force-dynamic';
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>!Number.isNaN(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v);
 const short = z.string().trim().min(1).max(150);
 const axis = z.array(z.number().min(0).max(10)).length(6);
 const action = z.discriminatedUnion('action', [
- z.object({action:z.literal('bottle'),name:short,producer:z.string().trim().max(150),vintage:z.string().regex(/^(\d{4}|NV)$/),style:z.enum(['Red','White','Orange','Rosé','Sparkling']),region:z.string().trim().max(150),count:z.number().int().min(0).max(9999),drink_from:z.string().regex(/^\d{4}$/),drink_to:z.string().regex(/^\d{4}$/),session_id:z.string().max(100).nullable()}),
+ z.object({action:z.literal('bottle'),grapes:z.string().trim().max(150).default(''),comments:z.string().max(5000).default(''),name:short,producer:z.string().trim().max(150),vintage:z.string().regex(/^(\d{4}|NV)$/),style:z.enum(['Red','White','Orange','Rosé','Sparkling']),region:z.string().trim().max(150),count:z.number().int().min(0).max(9999),drink_from:z.string().regex(/^\d{4}$/),drink_to:z.string().regex(/^\d{4}$/),session_id:z.string().max(100).nullable()}),
  z.object({action:z.literal('count'),id:short,count:z.number().int().min(0).max(9999)}),
  z.object({action:z.literal('taste'),bottle_id:short,date,score:z.number().min(1).max(5),notes:z.string().max(5000),axes:axis}),
  z.object({action:z.literal('session'),name:short,date}),
@@ -21,18 +22,20 @@ export async function GET(req:Request){
  if(url.searchParams.has('profile')){
   const p=await db.prepare('SELECT name,share_id FROM profiles WHERE share_id=? AND is_public=1').bind(url.searchParams.get('profile')).first();
   if(!p)return reply({error:'This profile is private or unavailable.'},404);
-  const rows=await db.prepare('SELECT t.axes,t.score,b.style FROM tastings t JOIN profiles p ON p.id=t.user_id JOIN bottles b ON b.id=t.bottle_id WHERE p.share_id=? AND p.is_public=1').bind(url.searchParams.get('profile')).all();
+  const rows=await db.prepare('SELECT t.axes,t.score,t.notes,b.style FROM tastings t JOIN profiles p ON p.id=t.user_id JOIN bottles b ON b.id=t.bottle_id WHERE p.share_id=? AND p.is_public=1').bind(url.searchParams.get('profile')).all();
   return reply({profile:p,values:flavor(rows.results as {score:number;axes:string}[]),palette:winePalette(rows.results as {score:number;style:string}[]),count:rows.results.length});
  }
  const user=await getChatGPTUser(); if(!user)return reply({user:null});
  await db.prepare('INSERT OR IGNORE INTO profiles (id,name,share_id,is_public,created_at) VALUES (?,?,?,0,?)').bind(user.userId,user.displayName,crypto.randomUUID(),new Date().toISOString()).run();
+ const admin=await isAdmin(user);
+ await db.prepare('UPDATE profiles SET last_seen_at=? WHERE id=?').bind(new Date().toISOString(),user.userId).run();
  const [profile,bottles,tastings,sessions]=await Promise.all([
  db.prepare('SELECT * FROM profiles WHERE id=?').bind(user.userId).first(),
- db.prepare('SELECT b.* FROM bottles b WHERE b.owner=? OR b.session_id IN (SELECT session_id FROM members WHERE user_id=?) ORDER BY b.created_at DESC').bind(user.userId,user.userId).all(),
- db.prepare('SELECT t.*,b.name,b.style,b.vintage,b.producer,b.photo_key FROM tastings t JOIN bottles b ON b.id=t.bottle_id WHERE t.user_id=? ORDER BY t.date DESC,t.created_at DESC').bind(user.userId).all(),
+ db.prepare('SELECT b.id,b.owner,b.session_id,b.name,b.producer,b.vintage,b.style,b.region,b.count,b.drink_from,b.drink_to,b.photo_key,b.grapes,CASE WHEN b.owner=? THEN b.comments ELSE NULL END AS comments FROM bottles b WHERE b.owner=? OR b.session_id IN (SELECT session_id FROM members WHERE user_id=?) ORDER BY b.created_at DESC').bind(user.userId,user.userId,user.userId).all(),
+ db.prepare('SELECT t.*,b.name,b.style,b.vintage,b.producer,b.photo_key,b.grapes FROM tastings t JOIN bottles b ON b.id=t.bottle_id WHERE t.user_id=? ORDER BY t.date DESC,t.created_at DESC').bind(user.userId).all(),
  db.prepare('SELECT s.*, (SELECT COUNT(*) FROM members m WHERE m.session_id=s.id) AS member_count FROM sessions s JOIN members m ON s.id=m.session_id WHERE m.user_id=? ORDER BY s.date DESC').bind(user.userId).all(),
  ]);
- return reply({user:{id:user.userId,email:user.email},profile,bottles:bottles.results,tastings:tastings.results,sessions:sessions.results});
+ return reply({user:{id:user.userId,email:user.email,is_admin:admin},profile,bottles:bottles.results,tastings:tastings.results,sessions:sessions.results});
  }catch(e){console.error('Club read failed',e);return reply({error:'Could not load your cellar. Please retry.'},503)}
 }
 export async function POST(req:Request){
@@ -56,7 +59,7 @@ export async function POST(req:Request){
  if(a.action==='bottle'){
   if(a.drink_to<a.drink_from)return reply({error:'The drinking window must end after it starts.'},400);
   if(a.session_id&&!await db.prepare('SELECT id FROM members WHERE session_id=? AND user_id=?').bind(a.session_id,uid).first())return reply({error:'Join this tasting before adding a bottle.'},403);
-  await db.prepare('INSERT INTO bottles (id,owner,session_id,name,producer,vintage,style,region,count,drink_from,drink_to,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,uid,a.session_id,a.name,a.producer,a.vintage,a.style,a.region,a.count,a.drink_from,a.drink_to,now).run();
+  await db.prepare('INSERT INTO bottles (id,owner,session_id,name,producer,vintage,style,region,count,drink_from,drink_to,created_at,grapes,comments) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,uid,a.session_id,a.name,a.producer,a.vintage,a.style,a.region,a.count,a.drink_from,a.drink_to,now,a.grapes,a.comments).run();
  }
  if(a.action==='count'){
   const r=await db.prepare('UPDATE bottles SET count=? WHERE id=? AND owner=?').bind(a.count,a.id,uid).run();

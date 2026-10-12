@@ -1,0 +1,12 @@
+{
+  "lastCheckedAt": "2026-10-12T14:31:37.284Z",
+  "added": 0,
+  "total": 1746,
+  "sources": [
+    {
+      "origin": "https://mysa.wine",
+      "count": 1978
+    }
+  ],
+  "coverage": "Growing source index, not every wine in existence. First seen is not a release date."
+}

@@ -1,0 +1,14 @@
+'use client';
+import {useState,useEffect,useRef} from 'react';
+import makers from '../data/winemakers.json';
+import {wines} from './catalog-data';
+export default function Winemaker({name,producer}:{name:string;producer:string}){
+ const [discover,setDiscover]=useState(false);const dialog=useRef<HTMLDialogElement>(null);useEffect(()=>{if(discover)dialog.current?.showModal();else dialog.current?.close()},[discover]);
+ const same=(a:string,b:string)=>a.trim().toLocaleLowerCase()===b.trim().toLocaleLowerCase();
+ const maker=makers.find(m=>same(m.name,producer));
+ const wine=wines.find(w=>same(w.producer,producer)&&same(w.name,name));
+ const related=wines.filter(w=>same(w.producer,producer)&&!same(w.name,name));
+ if(!maker&&!wine)return null;
+ const article=maker?.article||`${producer} is the producer behind ${name}.${wine?.region!=='Origin not specified'?` This bottle is listed from ${wine?.region}.`:''}${wine?.grapes!=='Grapes not specified'?` The listed grapes are ${wine?.grapes.replaceAll(' · ', ', ')}.`:''} These are details about this wine; a fuller story of the people behind it has not been verified yet.`;
+ return <details className="winemaker"><summary>Meet the winemaker <span>↗</span></summary><div><span className="eyebrow">THE PEOPLE BEHIND THE BOTTLE</span><h4>{producer}</h4><p>{article}</p><a className="text-button" href={maker?.source||wine?.source} target="_blank" rel="noopener noreferrer">{maker?.sourceLabel||wine?.sourceLabel} ↗</a>{maker&&<small>Source checked {maker.checkedAt}</small>}<button type="button" className="button outline maker-discover" aria-expanded={discover} onClick={()=>setDiscover(!discover)}>{discover?'Close discoveries':'Discover more from this winemaker'} ↗</button><dialog ref={dialog} className="maker-dialog" onCancel={e=>{e.preventDefault();setDiscover(false)}}><button type="button" className="text-button" onClick={()=>setDiscover(false)}>Close discoveries ×</button><section aria-label={'More wines from '+producer}><h4>More by {producer}.</h4>{related.length?<><p className="small">{related.length} other wines indexed so far. Availability and vintages may change.</p><div className="maker-wines">{related.map(w=><article key={w.id}><img src={w.photo} loading="lazy" referrerPolicy="no-referrer" alt={w.name+' bottle'}/><div><strong>{w.name}</strong><p>{w.style} · {w.vintage}<br/>{w.grapes}</p><a className="text-button" href={w.source} target="_blank" rel="noopener noreferrer">Explore bottle ↗</a><a className="text-button" href={'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(w.producer+' '+w.name+' wine shop')} target="_blank" rel="noopener noreferrer">Find a shop ↗</a></div></article>)}</div></>:<p>No other bottles from this producer are indexed yet. <a href={'https://www.google.com/search?q='+encodeURIComponent(producer+' wines producer')} target="_blank" rel="noopener noreferrer">Discover their wines on the web ↗</a></p>}</section></dialog></div></details>
+}
