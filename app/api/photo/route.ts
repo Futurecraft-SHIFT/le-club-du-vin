@@ -1,3 +1,4 @@
+import {areFriends} from '../../friendships';
 import {env} from 'cloudflare:workers';
 import {getChatGPTUser} from '../../chatgpt-auth';
 export const dynamic='force-dynamic';
@@ -5,7 +6,8 @@ const fail=(error:string,status:number)=>Response.json({error},{status,headers:{
 export async function GET(req:Request){
  const user=await getChatGPTUser();if(!user)return fail('Sign in to view this bottle photo.',401);
  const id=new URL(req.url).searchParams.get('id');
- const bottle=await env.DB!.prepare('SELECT photo_key FROM bottles WHERE id=? AND (owner=? OR session_id IN (SELECT session_id FROM members WHERE user_id=?))').bind(id,user.userId,user.userId).first<{photo_key:string|null}>();
+ let bottle=await env.DB!.prepare('SELECT photo_key FROM bottles WHERE id=? AND (owner=? OR session_id IN (SELECT session_id FROM members WHERE user_id=?))').bind(id,user.userId,user.userId).first<{photo_key:string|null}>();
+ if(!bottle){const candidate=await env.DB!.prepare('SELECT photo_key,owner FROM bottles WHERE id=?').bind(id).first<{photo_key:string|null;owner:string}>();if(candidate&&await areFriends(user.userId,candidate.owner))bottle=candidate}
  if(!bottle?.photo_key)return fail('Photo not found.',404);
  const image=await env.BUCKET!.get(bottle.photo_key);if(!image)return fail('Photo not found.',404);
  return new Response(image.body,{headers:{'Content-Type':image.httpMetadata?.contentType||'image/jpeg','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});

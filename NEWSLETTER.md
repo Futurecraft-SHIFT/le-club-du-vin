@@ -1,0 +1,4 @@
+# Weekly recommendations — preference only
+Signup and account settings record optional explicit opt-in; opt-out is available in profile settings. No email service, scheduler, or sending job is active.
+
+The later edition should contain exactly three personal bottle recommendations (lower/similar/higher retail price where verified offers exist), plus one originally written and attributed producer article. Include bottle source links, a shop-locator link and the producer official site when verified. Do not include private tasting notes, friends' inventories or purchase prices in email URLs. Verify the recipient email, require current consent at send time, include unsubscribe in every message, and stop immediately on opt-out. Store delivery events separately from tasting records. Configure sender-domain authentication and a mail provider before sending any newsletter.

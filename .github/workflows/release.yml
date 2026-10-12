@@ -1,0 +1,52 @@
+name: Validate and release
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: node scripts/check-core.mjs
+      - run: npx tsc --noEmit
+      - run: npm run build
+      - name: Hosting status
+        if: vars.DEPLOY_ENABLED != 'true'
+        run: echo 'Source validated. Public deployment awaits hosting and authentication setup.' >> "$GITHUB_STEP_SUMMARY"
+  deploy:
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WORKER_NAME: ${{ vars.WORKER_NAME }}
+      D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
+      D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME }}
+      R2_BUCKET_NAME: ${{ vars.R2_BUCKET_NAME }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+      VERIFIED_SCHEMA_SHA256: ${{ vars.VERIFIED_SCHEMA_SHA256 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node scripts/prepare-cloudflare-deploy.mjs
+      - run: npx wrangler deploy --config dist/server/wrangler.json

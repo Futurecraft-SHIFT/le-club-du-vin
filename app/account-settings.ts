@@ -1,0 +1,4 @@
+import {env} from 'cloudflare:workers';
+import type {ChatGPTUser} from './chatgpt-auth';
+export async function accountSettings(user:ChatGPTUser){const value=await env.BUCKET!.get('private-accounts/'+encodeURIComponent(user.userId)+'.json');return value?await value.json<{weekly:boolean;consentAt:string|null;updatedAt:string}>():{weekly:user.initialWeekly===true,consentAt:user.initialWeeklyConsent||null,updatedAt:null}}
+export async function saveAccountSettings(user:ChatGPTUser,weekly:boolean){const old=await accountSettings(user);await env.BUCKET!.put('private-accounts/'+encodeURIComponent(user.userId)+'.json',JSON.stringify({weekly,consentAt:weekly?(old.weekly?old.consentAt:new Date().toISOString()):null,updatedAt:new Date().toISOString(),newsletterVersion:'three-bottles-one-producer-v1'}),{httpMetadata:{contentType:'application/json'}})}

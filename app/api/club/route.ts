@@ -1,6 +1,9 @@
+import {accountSettings,saveAccountSettings} from '../../account-settings';
 import { env } from 'cloudflare:workers';
 import { getChatGPTUser } from '../../chatgpt-auth';
 import {WINE_STYLES} from '../../wine-styles';
+import {readBottlePrice,saveBottlePrice} from '../../bottle-price';
+import {CURRENCIES,PURCHASE_CONTEXTS} from '../../price-types';
 import { z } from 'zod';
 import {isAdmin} from '../../admin-auth';
 import { flavor, winePalette } from '../../flavor';
@@ -11,13 +14,14 @@ const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>!Number.isNaN(Dat
 const short = z.string().trim().min(1).max(150);
 const axis = z.array(z.number().int().min(0).max(100)).length(6).refine(v=>v.reduce((a,b)=>a+b,0)===100);
 const action = z.discriminatedUnion('action', [
- z.object({action:z.literal('bottle'),grapes:z.string().trim().max(150).default(''),comments:z.string().max(5000).default(''),name:short,producer:z.string().trim().max(150),vintage:z.string().regex(/^(\d{4}|NV)$/),style:z.enum(WINE_STYLES),region:z.string().trim().max(150),count:z.number().int().min(0).max(9999),drink_from:z.string().regex(/^\d{4}$/).optional(),drink_to:z.string().regex(/^\d{4}$/).optional(),session_id:z.string().max(100).nullable()}),
- z.object({action:z.literal('edit_bottle'),id:short,grapes:z.string().trim().max(150).default(''),comments:z.string().max(5000).default(''),name:short,producer:z.string().trim().max(150),vintage:z.string().regex(/^(\d{4}|NV)$/),style:z.enum(WINE_STYLES),region:z.string().trim().max(150),count:z.number().int().min(0).max(9999),drink_from:z.string().regex(/^\d{4}$/).optional(),drink_to:z.string().regex(/^\d{4}$/).optional(),session_id:z.string().max(100).nullable()}),
+ z.object({action:z.literal('bottle'),price:z.number().min(0).max(1000000).nullable().optional(),currency:z.enum(CURRENCIES).default('EUR'),purchase_context:z.enum(PURCHASE_CONTEXTS).default('Other'),grapes:z.string().trim().max(150).default(''),comments:z.string().max(5000).default(''),name:short,producer:z.string().trim().max(150),vintage:z.string().regex(/^(\d{4}|NV)$/),style:z.enum(WINE_STYLES),region:z.string().trim().max(150),count:z.number().int().min(0).max(9999),drink_from:z.string().regex(/^\d{4}$/).optional(),drink_to:z.string().regex(/^\d{4}$/).optional(),session_id:z.string().max(100).nullable()}),
+ z.object({action:z.literal('edit_bottle'),id:short,price:z.number().min(0).max(1000000).nullable().optional(),currency:z.enum(CURRENCIES).default('EUR'),purchase_context:z.enum(PURCHASE_CONTEXTS).default('Other'),grapes:z.string().trim().max(150).default(''),comments:z.string().max(5000).default(''),name:short,producer:z.string().trim().max(150),vintage:z.string().regex(/^(\d{4}|NV)$/),style:z.enum(WINE_STYLES),region:z.string().trim().max(150),count:z.number().int().min(0).max(9999),drink_from:z.string().regex(/^\d{4}$/).optional(),drink_to:z.string().regex(/^\d{4}$/).optional(),session_id:z.string().max(100).nullable()}),
  z.object({action:z.literal('count'),id:short,count:z.number().int().min(0).max(9999)}),
  z.object({action:z.literal('taste'),bottle_id:short,date,score:z.number().int().min(0).max(100),notes:z.string().max(5000),axes:axis}),
+ z.object({action:z.literal('edit_taste'),id:short,date,score:z.number().int().min(0).max(100),notes:z.string().max(5000),axes:axis}),
  z.object({action:z.literal('session'),name:short,date}),
  z.object({action:z.literal('join'),code:z.string().trim().min(6).max(64)}),
- z.object({action:z.literal('profile'),name:short,is_public:z.boolean()}),
+ z.object({action:z.literal('profile'),name:short,is_public:z.boolean(),weekly:z.boolean().optional()}),
 ]);
 function reply(data:unknown,status=200){return Response.json(data,{status,headers:{'Cache-Control':'no-store'}})}
 export async function GET(req:Request){
@@ -42,7 +46,8 @@ export async function GET(req:Request){
  db.prepare('SELECT t.*,b.name,b.style,b.vintage,b.producer,b.photo_key,b.grapes FROM tastings t JOIN bottles b ON b.id=t.bottle_id WHERE t.user_id=? ORDER BY t.date DESC,t.created_at DESC').bind(user.userId).all(),
  db.prepare('SELECT s.*, (SELECT COUNT(*) FROM members m WHERE m.session_id=s.id) AS member_count FROM sessions s JOIN members m ON s.id=m.session_id WHERE m.user_id=? ORDER BY s.date DESC').bind(user.userId).all(),
  ]);
- return reply({user:{id:user.userId,email:user.email,is_admin:admin},profile,bottles:bottles.results,tastings:tastings.results,sessions:sessions.results});
+ const pricedBottles=await Promise.all(bottles.results.map(async (b:any)=>b.owner===user.userId?{...b,...await readBottlePrice(user.userId,b.id)}:b));
+ return reply({user:{id:user.userId,email:user.email,is_admin:admin},profile,account:await accountSettings(user),bottles:pricedBottles,tastings:tastings.results,sessions:sessions.results});
  }catch(e){console.error('Club read failed',e);return reply({error:'Could not load your cellar. Please retry.'},503)}
 }
 export async function POST(req:Request){
@@ -54,6 +59,7 @@ export async function POST(req:Request){
  const parsed=action.safeParse(JSON.parse(body));if(!parsed.success)return reply({error:'Please check the form values.'},400);
  const a=parsed.data,db=env.DB!,uid=user.userId,id=crypto.randomUUID(),now=new Date().toISOString();
  if(a.action==='profile')await db.prepare('UPDATE profiles SET name=?,is_public=? WHERE id=?').bind(a.name,a.is_public?1:0,uid).run();
+ if(a.action==='profile'&&a.weekly!==undefined)await saveAccountSettings(user,a.weekly);
  if(a.action==='session')await db.batch([
   db.prepare('INSERT INTO sessions (id,owner,name,code,date) VALUES (?,?,?,?,?)').bind(id,uid,a.name,crypto.randomUUID().replaceAll('-','').slice(0,16).toUpperCase(),a.date),
   db.prepare('INSERT INTO members (id,session_id,user_id) VALUES (?,?,?)').bind(crypto.randomUUID(),id,uid),
@@ -66,9 +72,12 @@ export async function POST(req:Request){
  if(a.action==='bottle'){
   if(a.drink_from&&a.drink_to&&a.drink_to<a.drink_from)return reply({error:'The drinking window must end after it starts.'},400);
   if(a.session_id&&!await db.prepare('SELECT id FROM members WHERE session_id=? AND user_id=?').bind(a.session_id,uid).first())return reply({error:'Join this tasting before adding a bottle.'},403);
+  if(a.price!==undefined)await saveBottlePrice(uid,id,{price:a.price,currency:a.currency,purchase_context:a.purchase_context});
   await db.prepare('INSERT INTO bottles (id,owner,session_id,name,producer,vintage,style,region,count,drink_from,drink_to,created_at,grapes,comments) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,uid,a.session_id,a.name,a.producer,a.vintage,a.style,a.region,a.count,a.drink_from??'',a.drink_to??'',now,a.grapes,a.comments).run();
  }
  if(a.action==='edit_bottle'){
+  if(!await db.prepare('SELECT id FROM bottles WHERE id=? AND owner=?').bind(a.id,uid).first())return reply({error:'Only the bottle owner can edit its details.'},403);
+  if(a.price!==undefined)await saveBottlePrice(uid,a.id,{price:a.price,currency:a.currency,purchase_context:a.purchase_context});
   const result=await db.prepare('UPDATE bottles SET name=?,producer=?,vintage=?,style=?,region=?,count=?,grapes=?,comments=? WHERE id=? AND owner=?').bind(a.name,a.producer,a.vintage,a.style,a.region,a.count,a.grapes,a.comments,a.id,uid).run();
   if(!result.meta.changes)return reply({error:'Only the bottle owner can edit its details.'},403);
   return reply({ok:true,id:a.id});
@@ -76,6 +85,11 @@ export async function POST(req:Request){
  if(a.action==='count'){
   const r=await db.prepare('UPDATE bottles SET count=? WHERE id=? AND owner=?').bind(a.count,a.id,uid).run();
   if(!r.meta.changes)return reply({error:'Only the bottle owner can change its stock.'},403);
+ }
+ if(a.action==='edit_taste'){
+  const result=await db.prepare('UPDATE tastings SET date=?,score=?,notes=?,axes=? WHERE id=? AND user_id=?').bind(a.date,a.score/20,a.notes,JSON.stringify(a.axes.map(v=>v/10)),a.id,uid).run();
+  if(!result.meta.changes)return reply({error:'Only the person who recorded this tasting can edit it.'},403);
+  return reply({ok:true,id:a.id});
  }
  if(a.action==='taste'){
   const allowed=await db.prepare('SELECT id FROM bottles WHERE id=? AND (owner=? OR session_id IN (SELECT session_id FROM members WHERE user_id=?))').bind(a.bottle_id,uid,uid).first();

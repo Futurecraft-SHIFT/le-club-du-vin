@@ -1,0 +1,8 @@
+# Independent email/password accounts
+The /login route implements account creation, login, email verification, resend, forgotten-password recovery and password update through the official Supabase SSR SDK. Passwords are handled by Supabase; they are never stored in D1, R2, source code or logs. Username is a display name; email is the login identifier. Weekly-email opt-in is optional and no newsletter delivery is active.
+
+Required runtime values: SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY (public project key, never service_role). For standalone hosting set AUTH_MODE=supabase; missing configuration must fail closed. Enable email confirmation, use a verified SMTP sender, configure rate limits / bot protection as appropriate, and allow exact production and development callback URLs. Set Site URL to the public origin. Add /auth/confirm to allowed redirects. Recovery returns to /auth/confirm?next=/login?mode=update. For cross-device token-hash templates use /auth/confirm?token_hash={{ .TokenHash }}&type=signup (or recovery); retain the default PKCE code flow when using same-browser verification.
+
+Authentication settings are not configured in this checkout. The form deliberately blocks submission until configured. Live signup/reset delivery must be tested with the actual provider before public release.
+
+When email auth is enabled, all API routes verify Supabase identity and ignore Sites identity headers. The verified bootstrap owner email maps to the existing owner ID to preserve that account's cellar and admin role. Other pre-existing members require a reviewed identity mapping before migration; never map unverified email or user-supplied headers to existing owners. Do not copy deployment-local test records into production.

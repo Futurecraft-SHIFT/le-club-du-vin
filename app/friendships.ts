@@ -1,0 +1,7 @@
+import {env} from 'cloudflare:workers';
+export type Friendship={requester:string;recipient:string;status:'pending'|'accepted'|'removed';updatedAt:string};
+const pairKey=(a:string,b:string)=>'friendships/'+[a,b].sort().map(encodeURIComponent).join('/')+'.json';
+export async function friendship(a:string,b:string):Promise<Friendship|null>{const value=await env.BUCKET!.get(pairKey(a,b));return value?await value.json<Friendship>():null}
+export async function areFriends(a:string,b:string){if(a===b)return false;const relation=await friendship(a,b);return relation?.status==='accepted'&&[relation.requester,relation.recipient].includes(a)&&[relation.requester,relation.recipient].includes(b)}
+export async function writeFriendship(value:Friendship){await env.BUCKET!.put(pairKey(value.requester,value.recipient),JSON.stringify(value),{httpMetadata:{contentType:'application/json'}});for(const [owner,other] of [[value.requester,value.recipient],[value.recipient,value.requester]])await env.BUCKET!.put('friend-index/'+encodeURIComponent(owner)+'/'+encodeURIComponent(other)+'.json',JSON.stringify({id:other}),{httpMetadata:{contentType:'application/json'}})}
+export async function friendIds(user:string){const ids:string[]=[];let cursor:string|undefined;do{const page=await env.BUCKET!.list({prefix:'friend-index/'+encodeURIComponent(user)+'/',cursor,limit:100});for(const object of page.objects)ids.push(decodeURIComponent(object.key.split('/').pop()!.slice(0,-5)));cursor=page.truncated?page.cursor:undefined}while(cursor);return ids}

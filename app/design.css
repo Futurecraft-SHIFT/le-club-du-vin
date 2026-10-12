@@ -36,3 +36,8 @@
 
 .bottle-fields{border:0;padding:0;margin:0;min-width:0}.upload-retry{background:var(--yellow);padding:15px;border-radius:12px;font-size:14px;line-height:1.5}.bottle-fields:disabled{opacity:.8}
 
+/* Wine markers remain legible on selected days and small screens. */
+.days button{min-height:44px;gap:5px;padding:5px 2px}
+.wine-day-dots{gap:4px;min-height:11px;align-items:center;max-width:100%}
+.wine-day-dots i{width:10px;height:10px;flex:0 0 10px;border:1px solid #251722;box-shadow:0 0 0 1.5px var(--paper)}
+.days .selected .wine-day-dots i{box-shadow:0 0 0 2px var(--paper)}

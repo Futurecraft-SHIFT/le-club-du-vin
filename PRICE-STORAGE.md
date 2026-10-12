@@ -1,0 +1,4 @@
+# Bottle prices
+Private price/context records live in the existing R2 BUCKET as versioned-format JSON under private-bottle-prices/<encoded authenticated owner>/<bottle ID>.json. They are joined into the owner's club response and JSON export; table members and public profiles do not receive purchase prices. Bottle ownership is verified before editing. Deployment never clears these objects. No database schema change or destructive backfill is required.
+
+Retail recommendation reference: an explicitly selected shop purchase, defaulting to the latest recorded eligible bottle. Similar means within 15%; cheaper is below that band and more expensive above it. Only recent available merchant offers with a known currency are used. Exchange rates contain public reference data only and are cached for a day. Unavailable conversions or offers leave a tier empty. Price-paid context must never be inferred as shop for legacy records.

@@ -1,6 +1,7 @@
 [
   {
     "origin": "https://mysa.wine",
-    "label": "MYSA · wine merchant"
+    "label": "MYSA \u00b7 wine merchant",
+    "currency": "USD"
   }
 ]

@@ -9,3 +9,6 @@ Local preview records are test data in .wrangler/state and must not be published
 Before schema-affecting production updates, arrange and verify a database backup and restoration path with the hosting provider. User JSON exports are available but do not replace an operator backup or a tested disaster recovery process. No automatic backup schedule has been configured in this project.
 
 The local model runs through WebLLM in the visitor browser. No paid AI API calls are permitted without a new user instruction. Do not silently replace local inference with cloud inference. External web searches require a deliberate visitor click; do not send private notes in automatic searches.
+
+## GitHub synchronization
+The user authorized public source at https://github.com/Futurecraft-SHIFT/le-club-du-vin. After completing and validating app changes, commit and push the exact source to the github remote main branch; preserve Sites origin. Follow GITHUB-RELEASE.md. GitHub deploys only when hosting/authentication are configured. Never publish local user records, private photos, credentials or runtime folders. Do not claim a release is live without checking its deployment result.

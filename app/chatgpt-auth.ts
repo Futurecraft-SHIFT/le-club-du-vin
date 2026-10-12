@@ -1,8 +1,11 @@
+import {env} from 'cloudflare:workers';
+import {authConfig,memberIdentity} from './auth-server';
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 export type ChatGPTUser = {
   userId: string;
+  initialWeekly?:boolean; initialWeeklyConsent?:string|null;
   displayName: string;
   email: string;
   fullName: string | null;
@@ -19,6 +22,8 @@ const SIGN_OUT_PATH = "/signout-with-chatgpt";
 const CALLBACK_PATH = "/callback";
 
 export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
+  if(authConfig())return memberIdentity();
+  if(env.AUTH_MODE==='supabase'||process.env.AUTH_MODE==='supabase')return null;
   const requestHeaders = await headers();
   const userId = requestHeaders.get(USER_ID_HEADER);
   const email = requestHeaders.get(USER_EMAIL_HEADER);

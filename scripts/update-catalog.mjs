@@ -32,7 +32,7 @@ for(const p of all){
  const vintage=tags.find(t=>/^(?:19|20)\d{2}$/.test(t))||p.title.match(/\b(?:19|20)\d{2}\b/)?.[0]||'NV';
  const image=p.images.find(i=>/front/i.test(i.src)&&!/(back|label-back)/i.test(i.src))||p.images[0];
  const body=tags.find(t=>['Light','Medium','Full','Light Bodied','Medium Bodied','Full Bodied'].includes(t))||null;
- wines.set(id,{id,name:p.title.replace(new RegExp('\\s*'+vintage+'$'),'').trim(),producer:p.vendor,vintage,style,region:[region,country].filter(Boolean).join(', ')||'Origin not specified',abv,grapes:grapeList.join(' · ')||'Grapes not specified',body,photo:image.src,source:p.catalogSource.origin+'/products/'+p.handle,sourceLabel:p.catalogSource.label});
+ wines.set(id,{...wines.get(id),id,name:p.title.replace(new RegExp('\\s*'+vintage+'$'),'').trim(),producer:p.vendor,vintage,style,region:[region,country].filter(Boolean).join(', ')||'Origin not specified',abv,grapes:grapeList.join(' · ')||'Grapes not specified',body,photo:image.src,source:p.catalogSource.origin+'/products/'+p.handle,sourceLabel:p.catalogSource.label});
 }
 fs.writeFileSync('data/discoveries.json',JSON.stringify([...wines.values()],null,0)+'\n');
 fs.writeFileSync('data/catalog-status.json',JSON.stringify({lastCheckedAt:new Date().toISOString(),added,total:wines.size,sources:checked,coverage:'Growing source index, not every wine in existence. First seen is not a release date.'},null,2)+'\n');
