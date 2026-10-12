@@ -76,3 +76,21 @@ assert.equal((await post({...editTaste,axes:[40,10,20,5,10,14]})).status,400);
 ctx.setUser(identity('new'));assert.equal((await post(editTaste)).status,403);
 ctx.setUser(identity('owner'));assert.equal((await get()).tastings.find(t=>t.id===targetTaste.id).score*20,93);
 console.log('PASS: tasting edits retain identity and bottle, update score and axes without duplicates, validate totals and reject other members.');
+
+compile('app/nearby-wine.ts','nearby-wine');
+const nearby=await import(new URL('nearby-wine.mjs',base));
+assert.equal(nearby.publicWebsite('https://127.0.0.1/test'),null);
+assert.equal(nearby.publicWebsite('http://shop.example.com'),null);
+assert.equal(nearby.pageEvidence('<p>Meinklang Burgenlandrot 2023</p>','Meinklang Burgenlandrot 2023','https://shop.example.com').status,'listed');
+const stock=(name,availability)=>'<script type="application/ld+json">'+JSON.stringify({'@type':'Product',name,offers:{availability}})+'</script>';
+assert.equal(nearby.pageEvidence(stock('Meinklang Burgenlandrot 2023','https://schema.org/InStock'),'Meinklang Burgenlandrot 2023','https://shop.example.com').status,'online-stock');
+assert.equal(nearby.pageEvidence(stock('Different bottle','https://schema.org/InStock'),'Meinklang Burgenlandrot 2023','https://shop.example.com'),null);
+assert.equal(nearby.pageEvidence(stock('Meinklang Burgenlandrot 2023','https://schema.org/OutOfStock'),'Meinklang Burgenlandrot 2023','https://shop.example.com'),null);
+assert.equal(nearby.bottleMention('Meinklang '+('unrelated '.repeat(100))+'Burgenlandrot','Meinklang Burgenlandrot'),false);
+assert.equal(nearby.nearbyPlaces([{type:'node',id:1,lat:0,lon:0,tags:{name:'Near',shop:'wine'}},{type:'node',id:2,lat:1,lon:1,tags:{name:'Far',shop:'wine'}}],0,0).length,1);
+const venues=[1,2,3,4].map(n=>({id:String(n),kind:'shop',distance:n/10,status:n===4?'online-stock':'unconfirmed'}));
+assert.equal(nearby.chooseVenues(venues,'shop')[0].id,'4');assert.equal(nearby.chooseVenues(venues,'shop').length,3);
+console.log('PASS: strict radius, product-specific stock, out-of-stock rejection, local evidence matching and verified-first venue selection.');
+
+ctx.setUser(identity('owner'));await post({action:'profile',name:'ALEX B',is_public:false,weekly:true,contact_email:'new-contact@test.invalid'});assert.equal((await get()).account.contactEmail,'new-contact@test.invalid');await post({action:'profile',name:'ALEX B',is_public:false,weekly:false});assert.equal((await get()).account.contactEmail,'new-contact@test.invalid');assert.equal((await get()).user.email,'owner@test.invalid');assert.equal((await post({action:'profile',name:'ALEX B',is_public:false,contact_email:'invalid'})).status,400);ctx.setUser(identity('new'));assert.equal((await get()).account.contactEmail,undefined);
+console.log('PASS: contact email persists privately across settings changes, validates input and cannot change sign-in identity.');

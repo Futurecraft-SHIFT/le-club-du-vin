@@ -21,7 +21,7 @@ const action = z.discriminatedUnion('action', [
  z.object({action:z.literal('edit_taste'),id:short,date,score:z.number().int().min(0).max(100),notes:z.string().max(5000),axes:axis}),
  z.object({action:z.literal('session'),name:short,date}),
  z.object({action:z.literal('join'),code:z.string().trim().min(6).max(64)}),
- z.object({action:z.literal('profile'),name:short,is_public:z.boolean(),weekly:z.boolean().optional()}),
+ z.object({action:z.literal('profile'),name:short,is_public:z.boolean(),weekly:z.boolean().optional(),contact_email:z.string().trim().email().max(254).optional()}),
 ]);
 function reply(data:unknown,status=200){return Response.json(data,{status,headers:{'Cache-Control':'no-store'}})}
 export async function GET(req:Request){
@@ -59,7 +59,7 @@ export async function POST(req:Request){
  const parsed=action.safeParse(JSON.parse(body));if(!parsed.success)return reply({error:'Please check the form values.'},400);
  const a=parsed.data,db=env.DB!,uid=user.userId,id=crypto.randomUUID(),now=new Date().toISOString();
  if(a.action==='profile')await db.prepare('UPDATE profiles SET name=?,is_public=? WHERE id=?').bind(a.name,a.is_public?1:0,uid).run();
- if(a.action==='profile'&&a.weekly!==undefined)await saveAccountSettings(user,a.weekly);
+ if(a.action==='profile'&&(a.weekly!==undefined||a.contact_email!==undefined))await saveAccountSettings(user,a.weekly??(await accountSettings(user)).weekly,a.contact_email);
  if(a.action==='session')await db.batch([
   db.prepare('INSERT INTO sessions (id,owner,name,code,date) VALUES (?,?,?,?,?)').bind(id,uid,a.name,crypto.randomUUID().replaceAll('-','').slice(0,16).toUpperCase(),a.date),
   db.prepare('INSERT INTO members (id,session_id,user_id) VALUES (?,?,?)').bind(crypto.randomUUID(),id,uid),
