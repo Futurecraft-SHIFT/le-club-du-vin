@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { getChatGPTUser } from '../../chatgpt-auth';
+import {WINE_STYLES} from '../../wine-styles';
 import { z } from 'zod';
 import {isAdmin} from '../../admin-auth';
 import { flavor, winePalette } from '../../flavor';
@@ -8,11 +9,12 @@ import seedCatalog from '../../../data/discoveries.json';
 export const dynamic = 'force-dynamic';
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>!Number.isNaN(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v);
 const short = z.string().trim().min(1).max(150);
-const axis = z.array(z.number().min(0).max(10)).length(6);
+const axis = z.array(z.number().int().min(0).max(100)).length(6).refine(v=>v.reduce((a,b)=>a+b,0)===100);
 const action = z.discriminatedUnion('action', [
- z.object({action:z.literal('bottle'),grapes:z.string().trim().max(150).default(''),comments:z.string().max(5000).default(''),name:short,producer:z.string().trim().max(150),vintage:z.string().regex(/^(\d{4}|NV)$/),style:z.enum(['Red','White','Orange','Rosé','Sparkling']),region:z.string().trim().max(150),count:z.number().int().min(0).max(9999),drink_from:z.string().regex(/^\d{4}$/).optional(),drink_to:z.string().regex(/^\d{4}$/).optional(),session_id:z.string().max(100).nullable()}),
+ z.object({action:z.literal('bottle'),grapes:z.string().trim().max(150).default(''),comments:z.string().max(5000).default(''),name:short,producer:z.string().trim().max(150),vintage:z.string().regex(/^(\d{4}|NV)$/),style:z.enum(WINE_STYLES),region:z.string().trim().max(150),count:z.number().int().min(0).max(9999),drink_from:z.string().regex(/^\d{4}$/).optional(),drink_to:z.string().regex(/^\d{4}$/).optional(),session_id:z.string().max(100).nullable()}),
+ z.object({action:z.literal('edit_bottle'),id:short,grapes:z.string().trim().max(150).default(''),comments:z.string().max(5000).default(''),name:short,producer:z.string().trim().max(150),vintage:z.string().regex(/^(\d{4}|NV)$/),style:z.enum(WINE_STYLES),region:z.string().trim().max(150),count:z.number().int().min(0).max(9999),drink_from:z.string().regex(/^\d{4}$/).optional(),drink_to:z.string().regex(/^\d{4}$/).optional(),session_id:z.string().max(100).nullable()}),
  z.object({action:z.literal('count'),id:short,count:z.number().int().min(0).max(9999)}),
- z.object({action:z.literal('taste'),bottle_id:short,date,score:z.number().min(1).max(5),notes:z.string().max(5000),axes:axis}),
+ z.object({action:z.literal('taste'),bottle_id:short,date,score:z.number().int().min(0).max(100),notes:z.string().max(5000),axes:axis}),
  z.object({action:z.literal('session'),name:short,date}),
  z.object({action:z.literal('join'),code:z.string().trim().min(6).max(64)}),
  z.object({action:z.literal('profile'),name:short,is_public:z.boolean()}),
@@ -66,6 +68,11 @@ export async function POST(req:Request){
   if(a.session_id&&!await db.prepare('SELECT id FROM members WHERE session_id=? AND user_id=?').bind(a.session_id,uid).first())return reply({error:'Join this tasting before adding a bottle.'},403);
   await db.prepare('INSERT INTO bottles (id,owner,session_id,name,producer,vintage,style,region,count,drink_from,drink_to,created_at,grapes,comments) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,uid,a.session_id,a.name,a.producer,a.vintage,a.style,a.region,a.count,a.drink_from??'',a.drink_to??'',now,a.grapes,a.comments).run();
  }
+ if(a.action==='edit_bottle'){
+  const result=await db.prepare('UPDATE bottles SET name=?,producer=?,vintage=?,style=?,region=?,count=?,grapes=?,comments=? WHERE id=? AND owner=?').bind(a.name,a.producer,a.vintage,a.style,a.region,a.count,a.grapes,a.comments,a.id,uid).run();
+  if(!result.meta.changes)return reply({error:'Only the bottle owner can edit its details.'},403);
+  return reply({ok:true,id:a.id});
+ }
  if(a.action==='count'){
   const r=await db.prepare('UPDATE bottles SET count=? WHERE id=? AND owner=?').bind(a.count,a.id,uid).run();
   if(!r.meta.changes)return reply({error:'Only the bottle owner can change its stock.'},403);
@@ -73,7 +80,8 @@ export async function POST(req:Request){
  if(a.action==='taste'){
   const allowed=await db.prepare('SELECT id FROM bottles WHERE id=? AND (owner=? OR session_id IN (SELECT session_id FROM members WHERE user_id=?))').bind(a.bottle_id,uid,uid).first();
   if(!allowed)return reply({error:'This bottle is not in your cellar or a tasting you joined.'},403);
-  await db.prepare('INSERT INTO tastings (id,user_id,bottle_id,date,score,notes,axes,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(id,uid,a.bottle_id,a.date,a.score,a.notes,JSON.stringify(a.axes),now).run();
+  // Preserve the existing storage scales; forms use /100 and a 100-point composition.
+  await db.prepare('INSERT INTO tastings (id,user_id,bottle_id,date,score,notes,axes,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(id,uid,a.bottle_id,a.date,a.score/20,a.notes,JSON.stringify(a.axes.map(v=>v/10)),now).run();
  }
  return reply({ok:true,id});
  }catch(e){console.error('Club write failed',e);return reply({error:'Your changes were not saved. Please retry.'},500)}

@@ -1,3 +1,4 @@
+import {wineFamily} from './wine-styles';
 import {perceivedAxes,enjoyment} from './personal-taste';
 export const AXES=['Fruit','Tannin','Acidity','Oak','Body','Finish'];
 export const EXPLAIN=[
@@ -9,11 +10,11 @@ export const EXPLAIN=[
  'How long the flavours linger after a sip. Longer does not always mean better.',
 ];
 export type Tasting={id:string;bottle_id:string;date:string;score:number;notes:string;axes:string;name:string;style:string;vintage:string;producer:string;grapes?:string;photo_key?:string|null};
-export const WINE_COLORS:Record<string,string>={Red:'#b51f3b',White:'#d9b53d',Orange:'#ed7a24','Rosé':'#e784a0',Sparkling:'#86a867'};
+export const WINE_COLORS:Record<string,string>={Red:'#b51f3b',White:'#d9b53d',Orange:'#ed7a24','Rosé':'#e784a0',Sparkling:'#86a867','Classic Red':'#b51f3b','Natural Red':'#bc3254','Classic White':'#d9b53d','Natural White':'#dcc35d','Natural Rosé':'#e784a0','Classic Bubbles':'#86a867','Natural Bubbles':'#b4b35b','Pét-nat':'#b4b35b',Ancestral:'#b4b35b'};
 export type WineColor={style:string;color:string;weight:number;count:number};
 export function winePalette(tastings:{style:string;score:number;notes?:string}[]):WineColor[]{
  const totals:Record<string,{weight:number;count:number}>={};
- tastings.forEach(t=>{if(!WINE_COLORS[t.style])return;totals[t.style]??={weight:0,count:0};totals[t.style].weight+=enjoyment(t)**2;totals[t.style].count++});
+ tastings.forEach(entry=>{const t={...entry,style:wineFamily(entry.style)};if(!WINE_COLORS[t.style])return;totals[t.style]??={weight:0,count:0};totals[t.style].weight+=Math.max(0.1,enjoyment(t))**2;totals[t.style].count++});
  const total=Object.values(totals).reduce((n,t)=>n+t.weight,0);
  return Object.entries(totals).map(([style,v])=>({style,color:WINE_COLORS[style],weight:v.weight/total,count:v.count})).sort((a,b)=>b.weight-a.weight);
 }
@@ -26,7 +27,7 @@ export function paletteGradient(palette:WineColor[]){return `linear-gradient(125
 export function flavor(tastings:(Pick<Tasting,'score'|'axes'> & {notes?:string})[]){
  if(!tastings.length)return [0,0,0,0,0,0];
  let total=0;const scores=[0,0,0,0,0,0];
- tastings.forEach(t=>{const a=perceivedAxes(t);const weight=Math.pow(enjoyment(t),2);total+=weight;a.forEach((v:number,i:number)=>scores[i]+=v*weight)});
+ tastings.forEach(t=>{const a=perceivedAxes(t);const weight=Math.pow(Math.max(0.1,enjoyment(t)),2);total+=weight;a.forEach((v:number,i:number)=>scores[i]+=v*weight)});
  return scores.map(v=>Math.round(v/total*10)/10);
 }
 export const CANDIDATES=[

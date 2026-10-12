@@ -1,3 +1,4 @@
+import {percentages} from './tasting-scale';
 // No critic scores or catalog tasting profiles enter this interpretation.
 export function readExperience(notes:string){
  const text=notes.toLowerCase();
@@ -16,5 +17,5 @@ export function readExperience(notes:string){
  const positive=/\b(love|loved|enjoy|enjoyed|delicious|favorite|favourite|perfect for me|would buy again)\b/.test(text);
  return {axes,dislikes,sentiment:negative&&positive?0:negative?-1:positive?1:0};
 }
-export function perceivedAxes(t:{axes:string;notes?:string}){let base:number[];try{base=JSON.parse(t.axes)}catch{base=[5,5,5,5,5,5]}const read=readExperience(t.notes||'');return base.map((v,i)=>read.axes[i]??v)}
+export function perceivedAxes(t:{axes:string;notes?:string}){let base:number[];try{base=JSON.parse(t.axes)}catch{base=[5,5,5,5,5,5]}if(Math.abs(base.reduce((a,b)=>a+b,0)-10)<0.001)return base;const read=readExperience(t.notes||'');return percentages(base.map((v,i)=>read.axes[i]??v)).map(v=>v/10)}
 export function enjoyment(t:{score:number;notes?:string}){const s=readExperience(t.notes||'').sentiment;return s<0?1:s>0?5:t.score}
