@@ -33,3 +33,6 @@
 
 .maker-dialog{width:min(1000px,94vw);max-width:1000px;max-height:90dvh}.maker-dialog h4{font-size:clamp(24px,4vw,40px);margin:24px 0 12px}.maker-dialog .maker-wines{grid-template-columns:repeat(3,minmax(0,1fr));max-height:none;overflow:visible}.maker-dialog .maker-wines article{grid-template-columns:minmax(0,1fr);padding:22px}.maker-dialog .maker-wines img{width:100%;height:180px}.maker-dialog p{font-size:14px}.maker-dialog .maker-wines .text-button{font-size:13px}@media(max-width:650px){.maker-dialog .maker-wines{grid-template-columns:1fr}.maker-dialog .maker-wines article{grid-template-columns:80px minmax(0,1fr)}.maker-dialog .maker-wines img{height:155px}}
 
+
+.bottle-fields{border:0;padding:0;margin:0;min-width:0}.upload-retry{background:var(--yellow);padding:15px;border-radius:12px;font-size:14px;line-height:1.5}.bottle-fields:disabled{opacity:.8}
+

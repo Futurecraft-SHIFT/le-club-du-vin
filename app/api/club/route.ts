@@ -3,6 +3,8 @@ import { getChatGPTUser } from '../../chatgpt-auth';
 import { z } from 'zod';
 import {isAdmin} from '../../admin-auth';
 import { flavor, winePalette } from '../../flavor';
+import {personalDiscoveries} from '../../personal-ranking';
+import seedCatalog from '../../../data/discoveries.json';
 export const dynamic = 'force-dynamic';
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>!Number.isNaN(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v);
 const short = z.string().trim().min(1).max(150);
@@ -22,8 +24,11 @@ export async function GET(req:Request){
  if(url.searchParams.has('profile')){
   const p=await db.prepare('SELECT name,share_id FROM profiles WHERE share_id=? AND is_public=1').bind(url.searchParams.get('profile')).first();
   if(!p)return reply({error:'This profile is private or unavailable.'},404);
-  const rows=await db.prepare('SELECT t.axes,t.score,t.notes,b.style FROM tastings t JOIN profiles p ON p.id=t.user_id JOIN bottles b ON b.id=t.bottle_id WHERE p.share_id=? AND p.is_public=1').bind(url.searchParams.get('profile')).all();
-  return reply({profile:p,values:flavor(rows.results as {score:number;axes:string}[]),palette:winePalette(rows.results as {score:number;style:string}[]),count:rows.results.length});
+  const rows=await db.prepare('SELECT t.axes,t.score,t.notes,b.style,b.name,b.producer,b.grapes FROM tastings t JOIN profiles p ON p.id=t.user_id JOIN bottles b ON b.id=t.bottle_id WHERE p.share_id=? AND p.is_public=1').bind(url.searchParams.get('profile')).all();
+  const live=await db.prepare('SELECT data FROM catalog_entries').all<{data:string}>();
+  const merged=new Map(seedCatalog.map(w=>[w.id,w]));for(const row of live.results){const w=JSON.parse(row.data);merged.set(w.id,w)}
+  const suggestions=personalDiscoveries(rows.results as any,[...merged.values()]).map(w=>({id:w.id,name:w.name,producer:w.producer,style:w.style,grapes:w.grapes}));
+  return reply({profile:p,recommendations:suggestions,values:flavor(rows.results as {score:number;axes:string}[]),palette:winePalette(rows.results as {score:number;style:string}[]),count:rows.results.length});
  }
  const user=await getChatGPTUser(); if(!user)return reply({user:null});
  await db.prepare('INSERT OR IGNORE INTO profiles (id,name,share_id,is_public,created_at) VALUES (?,?,?,0,?)').bind(user.userId,user.displayName,crypto.randomUUID(),new Date().toISOString()).run();

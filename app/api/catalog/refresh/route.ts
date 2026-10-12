@@ -11,12 +11,14 @@ export async function POST(req:Request){
   if(env.PRIVATE_CATALOG_UPDATER!=='enabled')return reply({error:'Unattended updater disabled.'},403);
   if(req.headers.get('origin')&&req.headers.get('origin')!==new URL(req.url).origin)return reply({error:'Invalid origin'},403);
   const user=await getChatGPTUser();if(user&&!await isAdmin(user))return reply({error:'Admin access required.'},403);
-  const body=await req.text();if(body.length>1000)return reply({error:'Request too large'},413);
+  const body=await req.text();if(body.length>2000000)return reply({error:'Request too large'},413);
   const input=JSON.parse(body),page=Number(input.page);const source=sources.find(s=>s.origin===input.origin);
   if(!source||!Number.isInteger(page)||page<1||page>100)return reply({error:'Invalid source or page'},400);
   const url=new URL('/products.json',source.origin);url.searchParams.set('limit','250');url.searchParams.set('page',String(page));
-  const r=await fetch(url,{signal:AbortSignal.timeout(25000)});if(!r.ok)throw Error('Source unavailable');
-  const data:any=await r.json();if(!Array.isArray(data.products)||data.products.length>250)throw Error('Invalid source');
+  let data:any;
+  if(input.products!==undefined){data={products:input.products}}
+  else {const r=await fetch(url,{signal:AbortSignal.timeout(25000)});if(!r.ok)return reply({error:'Catalog source returned HTTP '+r.status+'. Fetch the public feed in the authorized updater and submit its product metadata.'},502);data=await r.json()}
+  if(!Array.isArray(data.products)||data.products.length>250)return reply({error:'Invalid product page'},400);
   const wines=data.products.map((p:any)=>normalizeProduct(p,source)).filter(Boolean),now=new Date().toISOString();
   for(let i=0;i<wines.length;i+=50)await env.DB!.batch(wines.slice(i,i+50).map((w:any)=>env.DB!.prepare('INSERT INTO catalog_entries (id,data,first_seen_at,last_seen_at) VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data,last_seen_at=excluded.last_seen_at').bind(w.id,JSON.stringify(w),now,now)));
   const done=data.products.length<250;
