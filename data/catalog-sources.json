@@ -3,5 +3,11 @@
     "origin": "https://mysa.wine",
     "label": "MYSA \u00b7 wine merchant",
     "currency": "USD"
+  },
+  {
+    "origin": "https://morenaturalwine.com",
+    "label": "MORE Natural Wine \u00b7 EU merchant",
+    "currency": "EUR",
+    "producerFromTitle": true
   }
 ]

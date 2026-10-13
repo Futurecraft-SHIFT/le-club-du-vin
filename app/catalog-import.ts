@@ -3,11 +3,13 @@ const grapes=['Altesse','Mondeuse','Chardonnay','Pinot Noir','Pinot Grigio','Pin
 const regions=['Abruzzo','Adelaide Hills','Alicante','Alsace','Andalucía','Andalusia','Ardèche','Auvergne','Bairrada','Baja California','Barossa','Beaujolais','Bergerac','Bizeljsko','Bordeaux','Burgenland','Burgundy','Cahors','California','Campania','Canary Islands','Canelones','Carnuntum','Castilla La Mancha','Castilla y Leon','Castilla y León','Catalonia','Catalunya','Champagne','Clare Valley','Corbières','Dalmatia','Dão','Douro','Emilia-Romagna','Emporda','Extremadura','Franken','Friuli Venezia Giulia','Friuli-Venezia Giulia','Gaillac','Galicia','Hawke\'s Bay','Itata Valley','Jura','Juznoslovenska','Kakheti','Kamptal','La Mancha','Languedoc','Languedoc-Roussillon','Lazio','Lemnos','Lisboa','Loire','Loire Valley','Maryland','Maule Valley','McLaren Vale','Mendocino','Moravia','Mosel','Moslavina','Mount Gambier','Murcia','Nahe','Nelson','New York','Ontario','Oregon','Penedes','Penedès','Pfalz','Piedmont','Puglia','Rheinhessen','Rhône','Rhône Valley','Rhone Valley','Roussillon','Sicily','South Australia','Štajerska','Styria','Swabia','Swartland','Texas','Trentino','Trnava','Tuscany','Umbria','Valencia','Veneto','Victoria','Vinho Verde','Weinland','Weinviertel','Western Cape','Yarra Valley','Savoie','Stellenbosch','Bugey','Quebec'];
 const norm=(s:string)=>s.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\b(?:19|20)\d{2}\b|\b(?:nv|n\.v\.)\b/g,'').replace(/[^a-z0-9]/g,'');
 
-export function normalizeProduct(p:any,source:{origin:string;label:string;currency?:string}){
+export function normalizeProduct(p:any,source:{origin:string;label:string;currency?:string;producerFromTitle?:boolean}){
 if(!Array.isArray(p.tags)||typeof p.title!=='string')return null;
  const type=String(p.product_type||'').toLowerCase();let style=type.includes('sparkling')?'Sparkling':type.includes('orange')?'Orange':/ros[eé]/.test(type)?'Rosé':type.startsWith('white')?'White':type.startsWith('red')?'Red':null;
  if(!style||/\b(bundle|pack|box|subscription)\b/i.test(p.tags.join(' '))||!p.vendor||!p.images?.length)return null;
- const id=norm(p.vendor+' '+p.title);
+ const titleParts=p.title.split(/\s+-\s+/),producer=source.producerFromTitle&&titleParts.length>1?titleParts.shift()!.trim():p.vendor;
+ const productTitle=(source.producerFromTitle&&titleParts.length?titleParts.join(' - '):p.title).replace(/\s*\((?:rare!?|low stock|limited).*?\)\s*$/i,'').trim();
+ const id=norm(producer+' '+productTitle);
  const tags=p.tags.map((t:string)=>t.trim()),country=countries.find(c=>tags.includes(c)),region=regions.find(r=>tags.includes(r));
  const grapeList=grapes.filter(g=>tags.some((t:string)=>t.toLowerCase()===g.toLowerCase()));
  const abv=tags.find((t:string)=>/^\d{1,2}(\.\d+)?\s*%$/.test(t))||null;
@@ -16,5 +18,5 @@ if(!Array.isArray(p.tags)||typeof p.title!=='string')return null;
  const body=tags.find((t:string)=>['Light','Medium','Full','Light Bodied','Medium Bodied','Full Bodied'].includes(t))||null;
  const variant=p.variants?.find((v:any)=>v.available===true&&Number(v.price)>0&&!/pack|case|bundle/i.test(String(v.title))) ;
  const price=variant&&source.currency?Number(variant.price):null;
- return {price,currency:source.currency,available:!!variant,priceCheckedAt:new Date().toISOString(),id,name:p.title.replace(new RegExp('\\s*'+vintage+'$'),'').trim(),producer:p.vendor,vintage,style,region:[region,country].filter(Boolean).join(', ')||'Origin not specified',abv,grapes:grapeList.join(' · ')||'Grapes not specified',body,photo:image.src,source:source.origin+'/products/'+p.handle,sourceLabel:source.label};
+ return {price,currency:source.currency,available:!!variant,priceCheckedAt:new Date().toISOString(),id,name:productTitle.replace(new RegExp('\\s*'+vintage+'$'),'').trim(),producer,vintage,style,region:[region,country].filter(Boolean).join(', ')||'Origin not specified',abv,grapes:grapeList.join(' · ')||'Grapes not specified',body,photo:image.src,source:source.origin+'/products/'+p.handle,sourceLabel:source.label};
 }
