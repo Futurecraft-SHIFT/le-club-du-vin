@@ -10,3 +10,14 @@ assert.deepEqual(priceDiscoveries(tsamples,wines,ref,{}).map(t=>t.wine?.style),[
 assert.equal(priceDiscoveries(tsamples,wines.filter(w=>!(w.style==='Orange'&&w.price===12)),ref,{})[0].wine,undefined);
 assert.ok(priceDiscoveries(tsamples,wines,ref,{})[0].wine.reasons[0].includes('like Desti'));
 console.log('PASS: orange reference beats strong red history; empty tiers never switch color; explanation names selected bottle.');
+
+const {compatibleWineType,inferWineMethod}=await import(pathToFileURL(process.cwd()+'/'+dir+'/wine-styles.mjs'));
+assert.equal(compatibleWineType({style:'Natural White'},{style:'White'}),false);
+assert.equal(compatibleWineType({style:'Natural White'},{style:'White',production:'natural'}),true);
+assert.equal(compatibleWineType({style:'Classic White'},{style:'White',production:'natural'}),false);
+assert.equal(compatibleWineType({style:'Classic Red'},{style:'Red',production:'classic'}),true);
+assert.equal(compatibleWineType({style:'Natural White'},{style:'White',name:'Pet-Nat',production:'natural'}),false);
+assert.equal(compatibleWineType({style:'Pét-nat'},{style:'Sparkling',sparklingMethod:'traditional',production:'natural'}),false);
+assert.equal(compatibleWineType({style:'Pét-nat'},{style:'Sparkling',sparklingMethod:'ancestral',production:'natural'}),true);
+assert.equal(inferWineMethod('organic biodynamic wine').production,'unknown');
+console.log('PASS: natural/classic strict matching; unknown and organic-only excluded; still versus sparkling and ancestral versus traditional separated.');
