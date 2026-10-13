@@ -41,3 +41,43 @@
 .wine-day-dots{gap:4px;min-height:11px;align-items:center;max-width:100%}
 .wine-day-dots i{width:10px;height:10px;flex:0 0 10px;border:1px solid #251722;box-shadow:0 0 0 1.5px var(--paper)}
 .days .selected .wine-day-dots i{box-shadow:0 0 0 2px var(--paper)}
+
+/* Shared form rhythm: labels above controls, equal edges, comfortable targets. */
+.auth-layout{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}
+.auth-form-panel{min-width:0}
+.auth-form-panel form{display:grid;gap:18px}
+.auth-form-panel form>label{display:flex;flex-direction:column;gap:8px;margin:0;min-width:0;line-height:1.4}
+label>input:not([type=checkbox]):not([type=radio]):not([type=range]),label>select,label>textarea{width:100%;max-width:100%;min-width:0}
+input:not([type=checkbox]):not([type=radio]):not([type=range]),select{min-height:48px}
+textarea{min-height:112px;line-height:1.5}
+input[type=checkbox],input[type=radio]{flex-shrink:0;margin:2px 0 0}
+.auth-form-panel form>.checkbox-label,.checkbox-label{flex-direction:row;align-items:flex-start;gap:10px;line-height:1.5}
+.auth-form-panel form>p{margin:0;overflow-wrap:anywhere}
+.auth-form-panel form>.button{width:100%;margin:4px 0 0}
+.auth-form-panel .newsletter-choice small{margin:6px 0 0}
+.auth-links{gap:8px 24px;align-items:flex-start}
+.auth-links .text-button{min-height:44px;text-align:left}
+.form-grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+.form-grid>label{line-height:1.5}
+.button-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.button-row>.button{min-height:48px;text-align:center;white-space:normal}
+.modal-heading{gap:16px;align-items:flex-start}
+.modal-heading h2{min-width:0;margin-bottom:0;overflow-wrap:anywhere}
+.modal-heading .icon-button{flex-shrink:0}
+.profile-layout>*,.public-portrait>*,.sommelier-layout>*,.friend-connect>*,.surprise-layout>*{min-width:0}
+.page-title h1,.section-heading h2,.friend-list h3,.friend-bottles h3{overflow-wrap:anywhere}
+.locator-place-heading{flex-wrap:wrap;gap:6px 14px}
+.friend-connect>form{display:flex;flex-direction:column}
+.friend-connect>form>.button{align-self:flex-start;margin-top:auto}
+@media(max-width:750px){.auth-layout{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:480px){
+ .form-grid{grid-template-columns:minmax(0,1fr)}
+ .auth-page{padding:24px 5%}
+ .auth-form-panel{padding:24px 20px}
+ .auth-form-panel h2{font-size:clamp(25px,7vw,34px);letter-spacing:-.055em}
+ .auth-story h1{font-size:clamp(40px,12vw,58px)}
+ input,select,textarea{font-size:16px}
+ .button-row>.button{flex:1 1 160px}
+ .auth-links{flex-direction:column;gap:0}
+ .tasting-axes label{grid-template-columns:52px minmax(0,1fr) 36px;gap:10px}
+}
