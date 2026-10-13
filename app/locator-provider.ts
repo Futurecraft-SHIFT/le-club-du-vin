@@ -20,13 +20,13 @@ export async function photonVenues(lat:number,lon:number,base='https://photon.ko
  const dy=2.52/111,dx=2.52/(111*Math.max(.001,Math.cos(lat*Math.PI/180)));
  const bbox=[Math.max(-180,lon-dx),Math.max(-90,lat-dy),Math.min(180,lon+dx),Math.min(90,lat+dy)].join(',');
  const groups=await Promise.allSettled([['shop.wine','shop.alcohol','shop.beverages'],['amenity.bar','amenity.pub','amenity.restaurant']].map(async categories=>{
-  const u=new URL(base);u.search=new URLSearchParams({lat:lat.toFixed(4),lon:lon.toFixed(4),bbox,limit:'20',location_bias_scale:'0'}).toString();
+  const u=new URL(base);u.search=new URLSearchParams({lat:lat.toFixed(4),lon:lon.toFixed(4),bbox,limit:'50',location_bias_scale:'0'}).toString();
   u.searchParams.set('include',categories.map(c=>'osm.'+c).join(','));
   const r=await request(u,{headers:LOCATOR_HEADERS,signal:AbortSignal.timeout(10000)}),data=JSON.parse(await limitedText(r));
   if(!Array.isArray(data.features))throw Error('Invalid place response');
   return data.features.flatMap((f:any)=>{const p=f.properties||{},key=p.osm_key,value=p.osm_value;
    if(!categories.includes(key+'.'+value))return [];
-   return [{id:p.osm_id,type:({N:'node',W:'way',R:'relation'} as Record<string,string>)[p.osm_type]||'node',lat:f.geometry?.coordinates?.[1],lon:f.geometry?.coordinates?.[0],tags:{name:p.name,[key]:value,'addr:street':p.street,'addr:housenumber':p.housenumber,'addr:postcode':p.postcode,'addr:city':p.city,website:p.extra?.website}}];
+   return [{id:p.osm_id,type:({N:'node',W:'way',R:'relation'} as Record<string,string>)[p.osm_type]||'node',lat:f.geometry?.coordinates?.[1],lon:f.geometry?.coordinates?.[0],tags:{name:p.name,[key]:value,'addr:street':p.street,'addr:housenumber':p.housenumber,'addr:postcode':p.postcode,'addr:city':p.city,website:p.extra?.website,bar:p.extra?.bar,cuisine:p.extra?.cuisine}}];
   });
  }));
  if(groups.every(g=>g.status==='rejected'))throw Error('MAP_PROVIDERS_UNAVAILABLE');

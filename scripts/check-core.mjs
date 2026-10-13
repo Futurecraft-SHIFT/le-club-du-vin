@@ -176,3 +176,11 @@ let photonCalls=0;const backupPlaces=await locatorProvider.photonVenues(52.5299,
 photonCalls=0;assert.equal((await locatorProvider.photonVenues(0,0,undefined,async()=>{if(++photonCalls===1)throw Error('unavailable');return Response.json({features:[]})})).partial,true);
 await assert.rejects(()=>locatorProvider.photonVenues(0,0,undefined,async()=>{throw Error('unavailable')}),/MAP_PROVIDERS_UNAVAILABLE/);
 console.log('PASS: independent Photon fallback validates venue categories, preserves radius filtering, and distinguishes partial/total outages.');
+
+compile('app/wine-venues.ts','wine-venues',{"'./nearby-wine'":"'./nearby-wine.mjs'"});const reviewedVenues=await import(new URL('wine-venues.mjs',base));
+assert.equal(nearby.mapWineFocus({name:'Random Pub','drink:wine':'yes'}),null);assert.equal(nearby.mapWineFocus({name:'Cocktail Bar'}),null);assert.ok(nearby.mapWineFocus({name:'Neighbourhood',bar:'wine'}));assert.ok(nearby.mapWineFocus({name:'Local Wine Bar'}));assert.equal(nearby.mapWineFocus({name:'Wine Bar',disused:'yes'}),null);
+assert.equal(nearby.websiteWineFocus('<p>Beer, cocktails, wine and burgers</p>'),null);assert.ok(nearby.websiteWineFocus('<h1>Bar de vinos naturales</h1>'));assert.ok(nearby.websiteWineFocus('<h1>Natural wine bistro</h1>'));
+const generic={id:'pub',kind:'drink',distance:.01,status:'unconfirmed'},wineBar={...generic,id:'wine',distance:1,wineFocus:'Wine bar'};
+assert.deepEqual(nearby.chooseVenues([generic,wineBar],'drink').map(v=>v.id),['wine']);assert.equal(nearby.chooseVenues([generic],'drink').length,0);
+assert.equal(reviewedVenues.reviewedWineVenues(52.52,13.4).length,0);const localReviewed=reviewedVenues.reviewedWineVenues(41.383,2.18);assert.equal(localReviewed.length,4);assert.ok(localReviewed.every(v=>v.distance<=2.5&&v.focusSource));assert.equal(reviewedVenues.mergeWineVenues([{...localReviewed[0],id:'osm'}],localReviewed).length,4);
+console.log('PASS: wine-focus evidence required, generic bars and wine-on-menu excluded, reviewed venues stay local, duplicates suppressed, fewer than three is allowed.');
