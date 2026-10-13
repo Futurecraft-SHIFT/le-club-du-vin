@@ -10,7 +10,7 @@ import Winemaker from './winemaker';
 import {wines as catalog} from './catalog-data';
 import {analyzeNotes} from './local-model';
 import {AXES,EXPLAIN,Tasting,recommendations,critique,WINE_COLORS,winePalette} from './flavor';
-export type Bottle={id:string;owner:string;session_id:string|null;name:string;producer:string;vintage:string;style:string;region:string;count:number;drink_from:string;drink_to:string;photo_key?:string|null;comments?:string|null;grapes?:string;price?:number|null;currency?:string;purchase_context?:string};
+export type Bottle={id:string;owner:string;session_id:string|null;name:string;producer:string;vintage:string;style:string;region:string;count:number;drink_from:string;drink_to:string;photo_key?:string|null;comments?:string|null;grapes?:string;price?:number|null;currency?:string;purchase_context?:string;purchase_country?:string;purchase_city?:string;purchase_date?:string};
 export function localDate(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 export function pretty(d:string){return new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}
 export function Fruit({className=''}:{className?:string}){return <svg className={className} viewBox="0 0 180 200" aria-hidden="true"><path fill="currentColor" d="M88 50C40 39 26 10 42 5c30-5 49 16 46 45ZM99 50C96 13 122 0 143 7c10 16-8 42-44 43ZM90 65c-22-27-57-8-53 16-39-2-45 38-20 55-18 24 8 55 34 44 8 30 51 24 53 4 35 15 64-14 48-40 36-16 25-56-5-59 1-29-37-43-57-20Z"/><path d="M38 87q25-18 47 3 24-24 53-6" fill="none" stroke="var(--lilac)" strokeWidth="3"/></svg>}
