@@ -17,5 +17,20 @@ export async function memberIdentity(){const client=await authClient();if(!clien
   await env.BUCKET!.put(bindingKey,JSON.stringify({providerId:user.id,userId}),{httpMetadata:{contentType:'application/json'}});
  }
 
+ // Linking a login to the existing owner can leave an empty pre-link profile.
+ // Archive only that authenticated, operator-pinned alias; never match by name or email.
+ if(user.id===env.ADMIN_SUPABASE_USER_ID&&userId!=='member:'+user.id){
+  const alias='member:'+user.id,db=env.DB!;
+  const duplicate=await db.prepare('SELECT * FROM profiles WHERE id=?').bind(alias).first();
+  if(duplicate){
+   const occupied=await db.prepare('SELECT (SELECT COUNT(*) FROM bottles WHERE owner=?) + (SELECT COUNT(*) FROM tastings WHERE user_id=?) + (SELECT COUNT(*) FROM sessions WHERE owner=?) + (SELECT COUNT(*) FROM members WHERE user_id=?) + (SELECT COUNT(*) FROM admins WHERE user_id=?) AS count').bind(alias,alias,alias,alias,alias).first<{count:number}>();
+   const friends=await env.BUCKET!.list({prefix:'friend-index/'+encodeURIComponent(alias)+'/',limit:1});
+   if(occupied?.count===0&&friends.objects.length===0){
+    const settings=await env.BUCKET!.get('private-accounts/'+encodeURIComponent(alias)+'.json');
+    await env.BUCKET!.put('private-auth/archived-profiles/'+encodeURIComponent(alias)+'.json',JSON.stringify({profile:duplicate,account:settings?await settings.json():null,canonicalUserId:userId,archivedAt:new Date().toISOString()}),{httpMetadata:{contentType:'application/json'}});
+    await db.prepare('DELETE FROM profiles WHERE id=? AND NOT EXISTS (SELECT 1 FROM bottles WHERE owner=?) AND NOT EXISTS (SELECT 1 FROM tastings WHERE user_id=?) AND NOT EXISTS (SELECT 1 FROM sessions WHERE owner=?) AND NOT EXISTS (SELECT 1 FROM members WHERE user_id=?) AND NOT EXISTS (SELECT 1 FROM admins WHERE user_id=?)').bind(alias,alias,alias,alias,alias,alias).run();
+   }
+  }
+ }
  return {userId,email:user.email,displayName:String(user.user_metadata?.username||user.email).slice(0,50),fullName:null,initialWeekly:user.user_metadata?.weekly_recommendations===true,initialWeeklyConsent:typeof user.user_metadata?.weekly_consent_at==='string'?user.user_metadata.weekly_consent_at:null};
 }

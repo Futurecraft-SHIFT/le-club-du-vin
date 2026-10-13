@@ -112,3 +112,15 @@ ctx.env.EMAIL_VERIFICATION_REQUIRED='false';assert.equal((await authRoute.GET())
 console.log('PASS: deferred verification configuration and blocked email-dependent actions.');
 
 const signupRequest=()=>new Request('https://test.invalid/api/auth',{method:'POST',headers:{Origin:'https://test.invalid','Content-Type':'application/json'},body:JSON.stringify({action:'signup',email:'new@test.invalid',password:'test-password-only-123',username:'NewMember',weekly:true})});authTest.setSignupSession({access_token:'test-session'});assert.equal((await (await authRoute.POST(signupRequest())).json()).signedIn,true);assert.equal(authTest.signupInput.options.data.email_verification_deferred,true);assert.equal(authTest.signupInput.options.data.weekly_recommendations,undefined);authTest.setSignupSession(null);assert.equal((await (await authRoute.POST(signupRequest())).json()).signedIn,undefined);console.log('PASS: immediate signup session, no false sign-in without session, deferred-email marker, newsletter opt-in removed.');
+
+// Linked-owner aliases must be archived before removal, and populated aliases must survive.
+authTest.setProviderUser({id:'verified-owner',email:'owner@test.invalid',email_confirmed_at:'2026-10-13',user_metadata:{}});
+ctx.setUser(identity('member:verified-owner'));await get();
+await authServer.memberIdentity();
+assert.equal(ctx.db.prepare('SELECT id FROM profiles WHERE id=?').get('member:verified-owner'),undefined);
+assert.ok(await ctx.env.BUCKET.get('private-auth/archived-profiles/member%3Averified-owner.json'));
+await get();const retainedBottle=await (await post({action:'bottle',name:'Do not remove',producer:'Maker',vintage:'2023',style:'Orange',region:'Test',count:1,session_id:null})).json();
+await authServer.memberIdentity();
+assert.ok(ctx.db.prepare('SELECT id FROM profiles WHERE id=?').get('member:verified-owner'));
+assert.ok(ctx.db.prepare('SELECT id FROM bottles WHERE id=?').get(retainedBottle.id));
+console.log('PASS: empty linked-owner duplicate archived and removed; populated alias and its bottle preserved.');
