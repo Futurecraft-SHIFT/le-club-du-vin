@@ -159,3 +159,15 @@ ctx.db.prepare('UPDATE profiles SET is_public=1 WHERE id=?').run('new');assert.o
 assert.equal((await membersRequest('member=missing')).status,404);assert.equal((await (await membersRequest('q=%25')).json()).total,0);
 assert.equal((await (await membersRequest('page=1')).json()).members.length,0);assert.equal((await (await membersRequest('q=ALEX')).json()).members[0].id,'owner');
 console.log('PASS: admin member directory requires admin, paginates and searches, lists registered bottles without private notes/prices, respects flavor sharing and self-access, disables caching.');
+
+compile('app/locator-provider.ts','locator-provider');
+const locatorProvider=await import(new URL('locator-provider.mjs',base));
+let providerCalls=0;
+const recovered=await locatorProvider.discoverVenues('test',undefined,async()=>{providerCalls++;return providerCalls===1?new Response('busy',{status:504}):Response.json({elements:[{id:123}]})});
+assert.equal(providerCalls,2);assert.equal(recovered[0].id,123);
+providerCalls=0;await locatorProvider.discoverVenues('test',undefined,async()=>{providerCalls++;return providerCalls===1?Response.json({elements:[],remark:'runtime error: timed out'}):Response.json({elements:[]})});assert.equal(providerCalls,2);
+providerCalls=0;await locatorProvider.discoverVenues('test',undefined,async()=>{providerCalls++;if(providerCalls===1)throw new DOMException('Timed out','TimeoutError');return Response.json({elements:[]})});assert.equal(providerCalls,2);
+providerCalls=0;assert.deepEqual(await locatorProvider.discoverVenues('test',undefined,async()=>{providerCalls++;return Response.json({elements:[]})}),[]);assert.equal(providerCalls,1);
+await assert.rejects(()=>locatorProvider.discoverVenues('test',undefined,async()=>new Response('busy',{status:429})),/MAP_PROVIDERS_UNAVAILABLE/);
+await assert.rejects(()=>locatorProvider.limitedText(new Response('12345'),4),/too large/);
+console.log('PASS: nearby map fallback on timeout/HTTP failure/incomplete responses, valid empty results preserved, exhausted providers distinguished, response size bounded.');
