@@ -98,3 +98,5 @@ input[type=checkbox],input[type=radio]{flex-shrink:0;margin:2px 0 0}
 @media(max-width:600px){.registered-artwork{height:280px}.journal-artwork{width:110px;margin-top:12px}.journal-artwork .registered-artwork{height:150px}}
 
 .bottle-card .bottle-label{display:block;border-radius:0}.bottle-card .bottle-label>span{margin:12px 18px 0}.bottle-card .bottle-details>.text-button{display:block;margin-bottom:8px}
+
+.palate-portrait .palate-answer{margin:28px 0;padding-top:24px;border-top:1px solid #4d2a8640}.palate-answer blockquote{margin:18px 0 22px;font-size:clamp(19px,2vw,25px);line-height:1.5;font-weight:600}.palate-portrait details{font-size:12px;line-height:1.6}.palate-portrait summary{cursor:pointer}.palate-portrait h2{overflow-wrap:anywhere}
