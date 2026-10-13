@@ -21,7 +21,7 @@ export async function photonVenues(lat:number,lon:number,base='https://photon.ko
  const bbox=[Math.max(-180,lon-dx),Math.max(-90,lat-dy),Math.min(180,lon+dx),Math.min(90,lat+dy)].join(',');
  const groups=await Promise.allSettled([['shop.wine','shop.alcohol','shop.beverages'],['amenity.bar','amenity.pub','amenity.restaurant']].map(async categories=>{
   const u=new URL(base);u.search=new URLSearchParams({lat:lat.toFixed(4),lon:lon.toFixed(4),bbox,limit:'20',location_bias_scale:'0'}).toString();
-  categories.forEach(c=>u.searchParams.append('include','osm.'+c));
+  u.searchParams.set('include',categories.map(c=>'osm.'+c).join(','));
   const r=await request(u,{headers:LOCATOR_HEADERS,signal:AbortSignal.timeout(10000)}),data=JSON.parse(await limitedText(r));
   if(!Array.isArray(data.features))throw Error('Invalid place response');
   return data.features.flatMap((f:any)=>{const p=f.properties||{},key=p.osm_key,value=p.osm_value;
