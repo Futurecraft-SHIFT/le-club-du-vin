@@ -96,3 +96,5 @@ input[type=checkbox],input[type=radio]{flex-shrink:0;margin:2px 0 0}
 .journal-artwork .registered-artwork{height:190px}
 .friend-bottles .registered-artwork{margin-bottom:20px}
 @media(max-width:600px){.registered-artwork{height:280px}.journal-artwork{width:110px;margin-top:12px}.journal-artwork .registered-artwork{height:150px}}
+
+.bottle-card .bottle-label{display:block;border-radius:0}.bottle-card .bottle-label>span{margin:12px 18px 0}.bottle-card .bottle-details>.text-button{display:block;margin-bottom:8px}
