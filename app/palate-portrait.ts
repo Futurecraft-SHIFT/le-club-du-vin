@@ -9,11 +9,11 @@ function sentiment(notes:string){
  const positive=/\b(lov(?:e|ed)|enjoy(?:ed)?|delicious|good|great|nice|favorite|favourite|would (?:buy|drink) again)\b/i.test(text);
  return negative?(positive?'mixed':'negative'):positive?'positive':'neutral';
 }
-export function palatePortrait(entries:Tasting[]){
+export function palatePortrait(entries:Tasting[],bottles:{id:string;name:string}[]=[]){
  const unique=[...new Map(entries.map(e=>[e.bottle_id,e])).values()];
  const liked=unique.filter(e=>{const s=sentiment(e.notes||'');return s==='positive'||(s==='neutral'&&!e.id.startsWith('note-')&&e.score>=3.5)}).sort((a,b)=>Number(sentiment(b.notes)==='positive')-Number(sentiment(a.notes)==='positive')||b.score-a.score);
  const dislikes=unique.flatMap(e=>readExperience(e.notes||'').dislikes).slice(0,2);
- if(!unique.length)return {title:'Your next sip starts the story.',paragraphs:['Tell us what made you smile, what felt too much, and whether you would pour it again. Your palate portrait will grow from those little details.'],quote:'I’m still exploring. Ask me after my next good bottle.',early:true};
+ if(!unique.length)return {title:bottles.length?'Your cellar, chapter '+bottles.length+'.':'Your next sip starts the story.',paragraphs:[...(bottles.length?['Now in your cellar: '+bottles[0].name+'. '+bottles.length+' bottles waiting to tell their story.']:[]),'Tell us what made you smile, what felt too much, and whether you would pour it again. Your palate portrait will grow from those little details.'],quote:'I’m still exploring. Ask me after my next good bottle.',early:true};
  const counts=new Map<string,number>();
  for(const e of liked){const safe=(e.notes||'').split(/[.!?;]|\bbut\b/i).filter(s=>! /\b(no|not|too|without|dislike|hate|didn.t|don.t)\b/i.test(s)).join(' ');for(const [pattern,label] of traits)if(pattern.test(safe))counts.set(label,(counts.get(label)||0)+1)}
  const words=[...counts].sort((a,b)=>b[1]-a[1]).slice(0,3).map(([label])=>label);
@@ -27,5 +27,9 @@ export function palatePortrait(entries:Tasting[]){
  if(dislikes.length)paragraphs.push('Your own warning labels: '+dislikes.map(s=>'“'+s+'”').join(' and ')+'. The next recommendation should pay attention to those, too.');
  const measured=liked.filter(e=>!e.id.startsWith('note-'));if(measured.length){const axes=flavor(measured);const ranked=axes.map((v,i)=>({v,name:AXES[i].toLowerCase()})).sort((a,b)=>b.v-a.v);if(ranked[0].v-ranked.at(-1)!.v>0.5)paragraphs.push('In the wines you enjoyed, '+join(ranked.slice(0,2).map(a=>a.name))+' stand out in your recorded flavor profiles. That describes what you noticed; your comments tell us how it felt.');}
  const quote=words.length?'I like wines with '+join(words)+'. '+(styles.length?'Lately, '+join(styles)+' have been catching my attention. ':'')+'Something with a bit of a story to tell, even if I don’t know all the wine words.':favorite?'I’ve been enjoying '+join(styles)+'. '+favorite.name+' is a good starting point if you’re choosing for me. I’m still working out exactly what makes it click.':'I’m still finding my kind of wine. I can tell you what did not click, but I’m keeping an open glass.';
- return {title:words.length?'A little character, please.':favorite?'Your kind of good.':'An open glass. An open mind.',paragraphs,quote,early:unique.length<5};
+ const total=bottles.length||unique.length;
+ const newest=bottles[0];
+ if(newest)paragraphs.unshift(unique.some(e=>e.bottle_id===newest.id)?'The latest chapter includes '+newest.name+'. Your portrait now draws on '+total+' registered bottles and '+entries.length+' tasting notes or reviews.':'New to the cellar: '+newest.name+'. That makes '+total+' registered bottles. Tell us how this one tastes to you before it shapes your preferences.');
+ const titles=['An open glass.','A new twist in your taste.','Your palate has a plot.','Another bottle, another clue.','Your taste keeps talking.'];
+ return {title:titles[total%titles.length]+' Chapter '+total+'.',paragraphs,quote:quote+' My wine story so far: '+total+' bottles, and counting.',early:unique.length<5};
 }

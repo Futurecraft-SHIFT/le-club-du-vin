@@ -9,7 +9,7 @@ import PersonalRecommendations from './personal-recommendations';
 export default function Sommelier({tastings,bottles,onStore}:{tastings:Tasting[];bottles:Bottle[];onStore:(name:string)=>void}){
  const experiences=useMemo(()=>bottles.flatMap(b=>{const reviews=tastings.filter(t=>t.bottle_id===b.id);if(reviews.length)return reviews.map(t=>({...t,notes:t.notes?.trim()||b.comments||''}));if(!b.comments?.trim())return [];return [{id:'note-'+b.id,bottle_id:b.id,name:b.name,producer:b.producer,style:b.style,vintage:b.vintage,grapes:b.grapes||'',date:'',score:2.5,axes:'[0,0,0,0,0,0]',notes:b.comments}]}).concat(tastings.filter(t=>!bottles.some(b=>b.id===t.bottle_id))),[bottles,tastings]);
  const [copied,setCopied]=useState(false);
- const portrait=useMemo(()=>palatePortrait(experiences),[experiences]);
+ const portrait=useMemo(()=>palatePortrait(experiences,bottles),[experiences,bottles]);
  const notes=experiences.filter(t=>t.notes.trim());
  const liked=notes.filter(t=>readExperience(t.notes).sentiment>0),disliked=notes.filter(t=>readExperience(t.notes).sentiment<0);
  const measured=experiences.filter(t=>!t.id.startsWith('note-'));

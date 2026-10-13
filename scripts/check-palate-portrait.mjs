@@ -12,3 +12,7 @@ assert.doesNotMatch(palatePortrait([{...bottle,id:'note-b1',notes:'A bottle from
 assert.equal(palatePortrait([bottle,bottle,bottle,bottle,bottle]).early,true);
 assert.match(palatePortrait([{...bottle,notes:''}]).quote,/Test wine/);
 console.log('PASS: empty history, personal descriptors, negative comments override high score, mixed notes, neutral bottle notes, duplicate tasting count, score fallback.');
+
+assert.notEqual(palatePortrait([bottle],[{id:'b1',name:'One'}]).title,palatePortrait([bottle],[{id:'b2',name:'Two'},{id:'b1',name:'One'}]).title);
+assert.match(palatePortrait([bottle],[{id:'b2',name:'Two'}]).paragraphs[0],/before it shapes/);
+assert.notEqual(palatePortrait([],[{id:'b1',name:'One'}]).title,palatePortrait([],[{id:'b2',name:'Two'},{id:'b1',name:'One'}]).title);
