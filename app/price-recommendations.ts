@@ -1,8 +1,8 @@
 import type {CatalogWine} from './catalog-search';
 import type {Tasting} from './flavor';
-import {personalDiscoveries} from './personal-ranking';
-export function priceDiscoveries(tastings:Tasting[],wines:CatalogWine[],reference:{price:number;currency:string},rates:Record<string,number>,now=Date.now()){
- const ranked=personalDiscoveries(tastings,wines,Number.MAX_SAFE_INTEGER);
+import {personalDiscoveries,bottleDiscoveries} from './personal-ranking';
+export function priceDiscoveries(tastings:Tasting[],wines:CatalogWine[],reference:{price:number;currency:string;name?:string;producer?:string;style?:string;grapes?:string},rates:Record<string,number>,now=Date.now()){
+ const ranked=reference.style&&reference.name?bottleDiscoveries(tastings,wines,{name:reference.name,producer:reference.producer||'',style:reference.style,grapes:reference.grapes},Number.MAX_SAFE_INTEGER):personalDiscoveries(tastings,wines,Number.MAX_SAFE_INTEGER);
  return rankedPriceDiscoveries(ranked,reference,rates,now);
 }
 export function rankedPriceDiscoveries<T extends CatalogWine>(ranked:T[],reference:{price:number;currency:string},rates:Record<string,number>,now=Date.now()){
