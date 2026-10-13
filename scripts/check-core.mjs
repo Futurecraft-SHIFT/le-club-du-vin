@@ -171,3 +171,8 @@ providerCalls=0;assert.deepEqual(await locatorProvider.discoverVenues('test',und
 await assert.rejects(()=>locatorProvider.discoverVenues('test',undefined,async()=>new Response('busy',{status:429})),/MAP_PROVIDERS_UNAVAILABLE/);
 await assert.rejects(()=>locatorProvider.limitedText(new Response('12345'),4),/too large/);
 console.log('PASS: nearby map fallback on timeout/HTTP failure/incomplete responses, valid empty results preserved, exhausted providers distinguished, response size bounded.');
+
+let photonCalls=0;const backupPlaces=await locatorProvider.photonVenues(52.5299,13.401,undefined,async u=>{photonCalls++;assert.ok(new URL(u).searchParams.has('bbox'));return Response.json({features:[{properties:{osm_type:'N',osm_id:1,name:'Wine shop',osm_key:'shop',osm_value:'wine',street:'Street'},geometry:{coordinates:[13.401,52.5299]}}]})});assert.equal(photonCalls,2);assert.equal(backupPlaces.elements.length,1);assert.equal(backupPlaces.partial,false);assert.equal(nearby.nearbyPlaces(backupPlaces.elements,52.5299,13.401).length,1);
+photonCalls=0;assert.equal((await locatorProvider.photonVenues(0,0,undefined,async()=>{if(++photonCalls===1)throw Error('unavailable');return Response.json({features:[]})})).partial,true);
+await assert.rejects(()=>locatorProvider.photonVenues(0,0,undefined,async()=>{throw Error('unavailable')}),/MAP_PROVIDERS_UNAVAILABLE/);
+console.log('PASS: independent Photon fallback validates venue categories, preserves radius filtering, and distinguishes partial/total outages.');

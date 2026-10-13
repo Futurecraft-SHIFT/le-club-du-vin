@@ -1,6 +1,6 @@
 import {env} from 'cloudflare:workers';
 import {z} from 'zod';
-import {discoverVenues,limitedText,LOCATOR_HEADERS} from '../../locator-provider';
+import {discoverVenues,photonVenues,limitedText,LOCATOR_HEADERS} from '../../locator-provider';
 import {nearbyPlaces,pageEvidence,publicWebsite,chooseVenues,type Place,type Evidence} from '../../nearby-wine';
 const schema=z.object({name:z.string().trim().min(2).max(300),location:z.string().trim().min(2).max(180).optional(),lat:z.number().min(-90).max(90).optional(),lon:z.number().min(-180).max(180).optional()}).refine(v=>v.location||v.lat!==undefined&&v.lon!==undefined);
 const cache=new Map<string,{until:number;value:unknown}>();
@@ -24,7 +24,7 @@ export async function POST(req:Request){try{
  if(lat===undefined||lon===undefined){const base=(env as any).LOCATOR_GEOCODER_URL||'https://photon.komoot.io/api/';const u=new URL(base);u.searchParams.set('q',input.location!);u.searchParams.set('limit','3');const r=await fetch(u,{headers,signal:AbortSignal.timeout(12000)});const d=JSON.parse(await limitedText(r));const locations=(d.features||[]).map((f:any)=>({lat:f.geometry?.coordinates?.[1],lon:f.geometry?.coordinates?.[0],label:[f.properties?.name,f.properties?.street,f.properties?.city,f.properties?.state,f.properties?.country].filter(Boolean).join(', ')})).filter((v:any)=>Number.isFinite(v.lat)&&Number.isFinite(v.lon));return remember(cacheKey,{locations})}
  // Round only the outbound discovery query (~11 m); exact distance filtering still uses the selected center.
  const a=lat.toFixed(4),b=lon.toFixed(4);const query='[out:json][timeout:8];(nwr(around:2520,'+a+','+b+')[shop~"^(wine|alcohol|beverages)$"];nwr(around:2520,'+a+','+b+')[amenity~"^(bar|pub|restaurant)$"];);out center tags;';
- const elements=await discoverVenues(query,(env as any).LOCATOR_OVERPASS_URL);const places=nearbyPlaces(elements,lat,lon);
+ let elements:any[],fallback=false,partial=false;try{elements=await discoverVenues(query,(env as any).LOCATOR_OVERPASS_URL)}catch{const backup=await photonVenues(lat,lon,(env as any).LOCATOR_GEOCODER_URL);elements=backup.elements;fallback=true;partial=backup.partial}const places=nearbyPlaces(elements,lat,lon);
  const results:(Place&Evidence)[]=[];
  // Research a wider candidate set, then put stock evidence ahead of distance.
  // Twelve venues and two pages each keep total outbound requests below fifty.
@@ -32,5 +32,5 @@ export async function POST(req:Request){try{
  const researchSignal=AbortSignal.timeout(8000);
  for(let i=0;i<selected.length;i+=6)results.push(...await Promise.all(selected.slice(i,i+6).map(p=>research(p,input.name,researchSignal))));
 
- return remember(cacheKey,{label,radius:2.5,checkedAt:new Date().toISOString(),shops:chooseVenues(results,'shop'),drinks:chooseVenues(results,'drink'),notice:'We researched up to six venues per category, prioritizing bottle stock evidence before distance. Our target is at least one verified listing in each group of three, but we cannot guarantee it within this radius. Online stock does not confirm stock at this physical address. PDF-only, inaccessible or unpublished wine lists cannot be verified.'});
- }catch(e){console.error('Nearby lookup failed',{stage:e instanceof Error&&e.message==='MAP_PROVIDERS_UNAVAILABLE'?'map-discovery':'location-search',reason:e instanceof Error?e.name:'Error'});return reply({error:e instanceof Error&&e.message==='MAP_PROVIDERS_UNAVAILABLE'?'Both nearby map services are busy. Your bottle is safe. Retry this location in a moment.':'Location search is unavailable right now. Retry, or use your location to search nearby venues.'},503)}}
+ return remember(cacheKey,{label,radius:2.5,checkedAt:new Date().toISOString(),shops:chooseVenues(results,'shop'),drinks:chooseVenues(results,'drink'),notice:(fallback?'Map services are busy, so these venues come from Photon’s place index. Merchant websites and bottle stock may be unavailable. '+(partial?'One venue category could not be loaded; retry to check it. ':''):'')+'We researched up to six venues per category, prioritizing bottle stock evidence before distance. Our target is at least one verified listing in each group of three, but we cannot guarantee it within this radius. Online stock does not confirm stock at this physical address. PDF-only, inaccessible or unpublished wine lists cannot be verified.'});
+ }catch(e){console.error('Nearby lookup failed',{stage:e instanceof Error&&e.message==='MAP_PROVIDERS_UNAVAILABLE'?'map-discovery':'location-search',reason:e instanceof Error?e.name:'Error'});return reply({error:e instanceof Error&&e.message==='MAP_PROVIDERS_UNAVAILABLE'?'The nearby place services are busy. Your bottle is safe. Retry this location in a moment.':'Location search is unavailable right now. Retry, or use your location to search nearby venues.'},503)}}
