@@ -81,3 +81,18 @@ input[type=checkbox],input[type=radio]{flex-shrink:0;margin:2px 0 0}
  .auth-links{flex-direction:column;gap:0}
  .tasting-axes label{grid-template-columns:52px minmax(0,1fr) 36px;gap:10px}
 }
+
+/* One artwork template for catalog photographs and member uploads. */
+.bottle-card .bottle-label{height:auto;padding:0;background:var(--lilac);border-radius:36% 32% 9% 12%/10% 12% 5% 6%;overflow:hidden}
+.bottle-card .bottle-label>span{position:relative;display:table;top:auto;left:auto;margin:0 0 0 18px;padding:10px 12px;z-index:2;max-width:calc(100% - 36px)}
+.registered-artwork{position:relative;isolation:isolate;overflow:hidden;background:var(--lilac);height:310px;width:100%;display:flex;align-items:center;justify-content:center;border-radius:32% 29% 8% 10%/9% 12% 5% 6%}
+.registered-artwork .wine-graphic{height:60%;z-index:0}
+.registered-photo-crop{position:relative;z-index:1;height:90%;width:50%;overflow:hidden;border-radius:44% 42% 16% 15%/9% 10% 4% 5%;mix-blend-mode:multiply}
+.registered-artwork .registered-photo-crop>img{display:block;width:100%;height:100%;max-width:none;object-fit:cover;object-position:center;margin:0;padding:0;background:transparent}
+.catalog-artwork .registered-photo-crop{width:70%;border-radius:0}
+.catalog-artwork .registered-photo-crop>img{object-fit:contain}
+.registered-photo-empty{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--purple);font-size:12px}
+.journal-artwork{width:150px;margin-top:18px}
+.journal-artwork .registered-artwork{height:190px}
+.friend-bottles .registered-artwork{margin-bottom:20px}
+@media(max-width:600px){.registered-artwork{height:280px}.journal-artwork{width:110px;margin-top:12px}.journal-artwork .registered-artwork{height:150px}}
