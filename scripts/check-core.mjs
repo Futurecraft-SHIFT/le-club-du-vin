@@ -146,3 +146,16 @@ testMembers[0].profile.allowed=false;assert.equal(reports.makeAudienceReport(tes
 const purchase=await (await post({action:'bottle',name:'Purchase test',producer:'Maker',vintage:'2026',style:'Natural White',region:'Test',count:1,session_id:null,price:25,currency:'EUR',purchase_context:'Restaurant',purchase_country:'France',purchase_city:'Paris',purchase_date:'2026-10-11'})).json();
 const bought=(await get()).bottles.find(b=>b.id===purchase.id);assert.equal(bought.purchase_country,'France');assert.equal(bought.purchase_date,'2026-10-11');assert.equal((await post({action:'edit_bottle',...bought,purchase_date:'2026-02-30'})).status,400);
 console.log('PASS: separate audience opt-in, same-origin writes, private fields, withdrawal clears demographics, admin-only aggregates, minimum group size, consent exclusion, currency/date/location/price filters, original purchase data persists.');
+
+compile('app/api/admin/members/route.ts','admin-members',{"'cloudflare:workers'":"'./context.mjs'","'../../../chatgpt-auth'":"'./context.mjs'","'../../../admin-auth'":"'./admin-auth.mjs'","'../../../flavor'":"'./flavor.mjs'"});
+const directory=await import(new URL('admin-members.mjs',base));
+const membersRequest=(query='')=>directory.GET(new Request('https://test.invalid/api/admin/members?'+query));
+ctx.setUser(null);assert.equal((await membersRequest()).status,401);
+ctx.setUser(identity('new'));assert.equal((await membersRequest()).status,403);assert.equal((await membersRequest('member=owner')).status,403);
+ctx.setUser(identity('owner'));let directoryResponse=await membersRequest();assert.equal(directoryResponse.headers.get('Cache-Control'),'private, no-store');let directoryData=await directoryResponse.json();assert.ok(directoryData.members.some(m=>m.id==='owner'));assert.ok(directoryData.members.every(m=>!('email' in m)&&!('notes' in m)));
+let mine=await (await membersRequest('member=owner')).json();assert.ok(mine.total>0);assert.ok(mine.portrait);assert.ok(mine.bottles.every(b=>!('notes' in b)&&!('comments' in b)&&!('price' in b)));
+ctx.db.prepare('UPDATE profiles SET is_public=0 WHERE id=?').run('new');assert.equal((await (await membersRequest('member=new')).json()).portrait,null);
+ctx.db.prepare('UPDATE profiles SET is_public=1 WHERE id=?').run('new');assert.ok((await (await membersRequest('member=new')).json()).portrait);
+assert.equal((await membersRequest('member=missing')).status,404);assert.equal((await (await membersRequest('q=%25')).json()).total,0);
+assert.equal((await (await membersRequest('page=1')).json()).members.length,0);assert.equal((await (await membersRequest('q=ALEX')).json()).members[0].id,'owner');
+console.log('PASS: admin member directory requires admin, paginates and searches, lists registered bottles without private notes/prices, respects flavor sharing and self-access, disables caching.');
