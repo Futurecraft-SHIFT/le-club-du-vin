@@ -1,12 +1,13 @@
-import {authClient,authConfig} from '../../auth-server';
+import {authClient,authConfig,emailVerificationRequired} from '../../auth-server';
 import {z} from 'zod';
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
-export async function GET(){return response({configured:!!authConfig()})}
+export async function GET(){return response({configured:!!authConfig(),emailVerificationRequired:emailVerificationRequired()})}
 export async function POST(req:Request){try{
  if(req.headers.get('origin')!==new URL(req.url).origin)return response({error:'Invalid origin.'},403);
  const client=await authClient();if(!client)return response({error:'Email sign-up is not activated yet. The authentication provider must be connected before accounts can be created.'},503);
  const raw=await req.text();if(raw.length>5000)return response({error:'Request too large.'},413);const input=JSON.parse(raw),origin=new URL(req.url).origin;
+ if(!emailVerificationRequired()&&['reset','resend','change_email'].includes(input.action))return response({error:'Email delivery is temporarily unavailable. Please keep your password safe.'},503);
  if(input.action==='logout'){await client.auth.signOut();return response({ok:true})}
  if(input.action==='update_password'){
   const password=z.string().min(12).max(128).safeParse(input.password);if(!password.success)return response({error:'Use a password with 12–128 characters.'},400);
@@ -20,8 +21,8 @@ export async function POST(req:Request){try{
  const password=z.string().min(input.action==='signup'?12:1).max(128).safeParse(input.password);if(!password.success)return response({error:'Use a password with 12–128 characters.'},400);
  if(input.action==='signup'){
   const username=z.string().trim().min(3).max(30).regex(/^[a-zA-Z0-9_.-]+$/).safeParse(input.username);if(!username.success)return response({error:'Username: 3–30 letters, numbers, dots, underscores or hyphens.'},400);
-  const {error}=await client.auth.signUp({email:email.data,password:password.data,options:{emailRedirectTo:origin+'/auth/confirm',data:{username:username.data,weekly_recommendations:input.weekly===true,weekly_consent_at:input.weekly===true?new Date().toISOString():null}}});
-  if(error)return response({error:'Sign-up could not be completed. Check the details or try again later.'},400);return response({ok:true,message:'Check your email to verify your account, then log in. Weekly emails are not sending yet.'});
+  const {data,error}=await client.auth.signUp({email:email.data,password:password.data,options:{emailRedirectTo:origin+'/auth/confirm',data:{username:username.data,email_verification_deferred:!emailVerificationRequired()}}});
+  if(error)return response({error:'Sign-up could not be completed. Check the details or try again later.'},400);if(data.session)return response({ok:true,signedIn:true});return response({ok:true,message:emailVerificationRequired()?'Check your email to verify your account, then log in.':'Your sign-in could not be started. Try logging in with your email and password.'});
  }
  if(input.action==='login'){const {data,error}=await client.auth.signInWithPassword({email:email.data,password:password.data});if(error||!data.user?.email_confirmed_at)return response({error:'Could not sign in. Check your email, password and email verification.'},401);return response({ok:true,signedIn:true})}
  return response({error:'Invalid request.'},400);
