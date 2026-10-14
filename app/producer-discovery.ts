@@ -12,7 +12,7 @@ export async function discoverProducer(producer:string){
  await db.prepare('INSERT INTO catalog_sync (origin,last_checked_at,last_page,complete) VALUES (?,?,0,0) ON CONFLICT(origin) DO UPDATE SET last_checked_at=excluded.last_checked_at,complete=0').bind(key,now).run();
  const results=await Promise.allSettled(sources.map(async source=>{
   const signal=AbortSignal.timeout(10000);
-  const json=async(url:URL)=>{const r=await fetch(url,{signal,redirect:'error',headers:{'Accept':'application/json','User-Agent':'LeClubDuVin/1.0 (wine catalogue lookup)'}});if(!r.ok)throw Error('HTTP '+r.status);const text=await r.text();if(text.length>2000000)throw Error('Source too large');return JSON.parse(text)};
+  const json=async(url:URL)=>{const r=await fetch(url,{signal,redirect:'manual',headers:{'Accept':'application/json','User-Agent':'LeClubDuVin/1.0 (wine catalogue lookup)'}});if(!r.ok)throw Error('HTTP '+r.status);const text=await r.text();if(text.length>2000000)throw Error('Source too large');return JSON.parse(text)};
   const url=new URL('/search/suggest.json',source.origin);url.searchParams.set('q',producer);url.searchParams.set('resources[type]','product');url.searchParams.set('resources[limit]','10');url.searchParams.set('resources[options][unavailable_products]','show');
   const search=await json(url),products=search.resources?.results?.products;
   if(!Array.isArray(products))throw Error('Invalid source response');
