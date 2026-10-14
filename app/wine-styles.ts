@@ -27,3 +27,5 @@ export function recommendationStyle(w:{style:string;name?:string}&WineMethodInfo
  if(t.family==='Orange')return 'Orange · natural';
  return (t.production==='natural'?'Natural ':t.production==='classic'?'Classic ':'')+(t.sparkling?'bubbles':t.family.toLowerCase())+(t.method==='traditional'?' · traditional method':'');
 }
+
+export function registrationStyle(w:{style:string;name?:string}&WineMethodInfo){const t=wineTraits(w);if(t.method==='ancestral')return 'Pét-nat';if(t.sparkling)return t.production==='natural'?'Natural Bubbles':t.production==='classic'?'Classic Bubbles':'Sparkling';if(t.family==='Orange')return 'Orange';if(t.production==='natural')return 'Natural '+t.family;if(t.production==='classic'&&t.family!=='Rosé')return 'Classic '+t.family;return t.family}

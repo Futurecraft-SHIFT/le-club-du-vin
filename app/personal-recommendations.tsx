@@ -16,7 +16,7 @@ import {priceDiscoveries} from './price-recommendations';
 import {money} from './price-types';
 
 function RecommendationActions({wine,onStore}:{wine:{name:string;producer:string;source:string};onStore:(s:string)=>void}){
- return <div className="recommendation-actions"><a className="button dark" href={wine.source} target="_blank" rel="noopener noreferrer" aria-label={'Buy '+wine.name+' online (opens merchant website)'}>Buy online ↗</a><button className="text-button" onClick={()=>onStore(wine.producer+' '+wine.name)}>Find nearby shops ↗</button></div>;
+ return <div className="recommendation-actions">{wine.source&&<a className="button dark" href={wine.source} target="_blank" rel="noopener noreferrer" aria-label={'Buy '+wine.name+' online (opens merchant website)'}>Buy online ↗</a>}<button className="text-button" onClick={()=>onStore(wine.producer+' '+wine.name)}>Find nearby shops ↗</button></div>;
 }
 
 export default function PersonalRecommendations({tastings,bottles=[],onStore}:{tastings:Tasting[];bottles?:Bottle[];onStore:(s:string)=>void}){

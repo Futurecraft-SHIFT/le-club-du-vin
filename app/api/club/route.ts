@@ -1,7 +1,8 @@
+import {publishWine,catalogWine,catalogKey} from '../../shared-catalog';
 import {accountSettings,saveAccountSettings} from '../../account-settings';
 import { env } from 'cloudflare:workers';
 import { getChatGPTUser } from '../../chatgpt-auth';
-import {WINE_STYLES} from '../../wine-styles';
+import {WINE_STYLES,registrationStyle} from '../../wine-styles';
 import {readBottlePrice,saveBottlePrice} from '../../bottle-price';
 import {CURRENCIES,PURCHASE_CONTEXTS} from '../../price-types';
 import { z } from 'zod';
@@ -17,7 +18,7 @@ const action = z.discriminatedUnion('action', [
  z.object({action:z.literal('bottle'),price:z.number().min(0).max(1000000).nullable().optional(),currency:z.enum(CURRENCIES).default('EUR'),purchase_context:z.enum(PURCHASE_CONTEXTS).default('Other'),purchase_country:z.string().trim().max(80).optional(),purchase_city:z.string().trim().max(80).optional(),purchase_date:z.union([z.literal(''),date]).optional(),grapes:z.string().trim().max(150).default(''),comments:z.string().max(5000).default(''),name:short,producer:z.string().trim().max(150),vintage:z.string().regex(/^(\d{4}|NV)$/),style:z.enum(WINE_STYLES),region:z.string().trim().max(150),count:z.number().int().min(0).max(9999),drink_from:z.string().regex(/^\d{4}$/).optional(),drink_to:z.string().regex(/^\d{4}$/).optional(),session_id:z.string().max(100).nullable()}),
  z.object({action:z.literal('edit_bottle'),id:short,price:z.number().min(0).max(1000000).nullable().optional(),currency:z.enum(CURRENCIES).default('EUR'),purchase_context:z.enum(PURCHASE_CONTEXTS).default('Other'),purchase_country:z.string().trim().max(80).optional(),purchase_city:z.string().trim().max(80).optional(),purchase_date:z.union([z.literal(''),date]).optional(),grapes:z.string().trim().max(150).default(''),comments:z.string().max(5000).default(''),name:short,producer:z.string().trim().max(150),vintage:z.string().regex(/^(\d{4}|NV)$/),style:z.enum(WINE_STYLES),region:z.string().trim().max(150),count:z.number().int().min(0).max(9999),drink_from:z.string().regex(/^\d{4}$/).optional(),drink_to:z.string().regex(/^\d{4}$/).optional(),session_id:z.string().max(100).nullable()}),
  z.object({action:z.literal('count'),id:short,count:z.number().int().min(0).max(9999)}),
- z.object({action:z.literal('taste'),bottle_id:short,date,score:z.number().int().min(0).max(100),notes:z.string().max(5000),axes:axis}),
+ z.object({action:z.literal('taste'),bottle_id:short,vintage:z.string().regex(/^(\d{4}|NV)$/).optional(),date,score:z.number().int().min(0).max(100),notes:z.string().max(5000),axes:axis}),
  z.object({action:z.literal('edit_taste'),id:short,date,score:z.number().int().min(0).max(100),notes:z.string().max(5000),axes:axis}),
  z.object({action:z.literal('session'),name:short,date}),
  z.object({action:z.literal('join'),code:z.string().trim().min(6).max(64)}),
@@ -73,6 +74,7 @@ export async function POST(req:Request){
   if(a.drink_from&&a.drink_to&&a.drink_to<a.drink_from)return reply({error:'The drinking window must end after it starts.'},400);
   if(a.session_id&&!await db.prepare('SELECT id FROM members WHERE session_id=? AND user_id=?').bind(a.session_id,uid).first())return reply({error:'Join this tasting before adding a bottle.'},403);
   if(a.price!==undefined)await saveBottlePrice(uid,id,{price:a.price,currency:a.currency,purchase_context:a.purchase_context,purchase_country:a.purchase_country,purchase_city:a.purchase_city,purchase_date:a.purchase_date});
+  await publishWine(a);
   await db.prepare('INSERT INTO bottles (id,owner,session_id,name,producer,vintage,style,region,count,drink_from,drink_to,created_at,grapes,comments) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,uid,a.session_id,a.name,a.producer,a.vintage,a.style,a.region,a.count,a.drink_from??'',a.drink_to??'',now,a.grapes,a.comments).run();
  }
  if(a.action==='edit_bottle'){
@@ -80,6 +82,7 @@ export async function POST(req:Request){
   if(a.price!==undefined)await saveBottlePrice(uid,a.id,{price:a.price,currency:a.currency,purchase_context:a.purchase_context,purchase_country:a.purchase_country,purchase_city:a.purchase_city,purchase_date:a.purchase_date});
   const result=await db.prepare('UPDATE bottles SET name=?,producer=?,vintage=?,style=?,region=?,count=?,grapes=?,comments=? WHERE id=? AND owner=?').bind(a.name,a.producer,a.vintage,a.style,a.region,a.count,a.grapes,a.comments,a.id,uid).run();
   if(!result.meta.changes)return reply({error:'Only the bottle owner can edit its details.'},403);
+  await publishWine(a);
   return reply({ok:true,id:a.id});
  }
  if(a.action==='count'){
@@ -92,6 +95,17 @@ export async function POST(req:Request){
   return reply({ok:true,id:a.id});
  }
  if(a.action==='taste'){
+  let tastingBottleId=a.bottle_id;
+  if(a.bottle_id.startsWith('catalog:')){
+   const wine=await catalogWine(a.bottle_id.slice(8));
+   if(!wine||!a.vintage)return reply({error:'Choose a catalogue wine and enter its vintage (or NV).'},400);
+   const own=await db.prepare('SELECT id,name,producer,vintage FROM bottles WHERE owner=? AND session_id IS NULL').bind(uid).all<any>();
+   const match=own.results.find(b=>catalogKey(b)===catalogKey(wine)&&b.vintage===a.vintage);
+   tastingBottleId=match?.id||crypto.randomUUID();
+   const tasting=db.prepare('INSERT INTO tastings (id,user_id,bottle_id,date,score,notes,axes,created_at) VALUES (?,?,?,?,?,?,?,?)').bind(id,uid,tastingBottleId,a.date,a.score/20,a.notes,JSON.stringify(a.axes.map(v=>v/10)),now);
+   const statements=match?[tasting]:[db.prepare('INSERT INTO bottles (id,owner,session_id,name,producer,vintage,style,region,count,drink_from,drink_to,created_at,grapes,comments) VALUES (?,?,NULL,?,?,?,?,?,0,?,?,?, ?,?)').bind(tastingBottleId,uid,wine.name,wine.producer,a.vintage,registrationStyle(wine),wine.region,'','',now,wine.grapes||'',''),tasting];
+   await db.batch(statements);return reply({ok:true,id});
+  }
   const allowed=await db.prepare('SELECT id FROM bottles WHERE id=? AND (owner=? OR session_id IN (SELECT session_id FROM members WHERE user_id=?))').bind(a.bottle_id,uid,uid).first();
   if(!allowed)return reply({error:'This bottle is not in your cellar or a tasting you joined.'},403);
   // Preserve the existing storage scales; forms use /100 and a 100-point composition.
